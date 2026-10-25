@@ -1,262 +1,307 @@
-"""知危鉴 · 灾害风险预警与案例复盘平台（Streamlit 版）
+"""知危鉴 · 灾害风险预警与案例复盘平台（Streamlit · 纯在线版）
+
 入口：streamlit run app.py
 
-功能：
-- 在线天气数据获取（Open-Meteo）：温度/风速/降水实时拉取并萃取展示
-- 历史灾害案例（5 类：台风/地震/泥石流/爆炸/火灾）地图联动
-  地图 ↔ 列表 双向同步，支持按 时间范围 + 地理位置 + 分类 筛选
-- 在线搜索（按关键词）+ 数据萃取（导出 CSV）
-
-依赖：streamlit, folium
+架构：纯在线 —— 数据全部来自在线 API（USGS 地震 / Open-Meteo 天气 / NHC 台风），
+无本地文件存储、无本地计算兜底。链路：在线搜索 → 在线清洗整合 → 在线可视化。
+模块：① 在线态势地图（实时+历史轨迹统一承载）② 在线搜索·可视化
+      ③ 应急方案模块 ④ 实时天气仪表盘
 """
 import json
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone
 
 import streamlit as st
 import folium
-from folium import Map, Marker
+import pandas as pd
+import altair as alt
 
-import disasters
-import weather
+import data_online
 
-st.set_page_config(page_title="知危鉴 · 应急风险预警与案例复盘平台", layout="wide")
-
-# ---------- 品牌 ----------
-st.sidebar.title("知危鉴")
-st.sidebar.caption("子品牌：CaseRescue 知灾析策 · 应急案例智能处理助手")
+# ---------------- 品牌与页面 ----------------
+st.set_page_config(page_title="知危鉴 · 应急风险预警与案例复盘平台", layout="wide",
+                   page_icon="⚠️")
+st.sidebar.title("⚠️ 知危鉴")
+st.sidebar.caption("纯在线 · 灾害风险预警与案例复盘\n子品牌：CaseRescue 知灾析策")
 st.sidebar.divider()
 
-tab = st.sidebar.radio("功能模块", ["⚡ 实时天气数据", "🗺 灾害案例地图", "🔍 在线搜索与萃取", "📊 数据统计"])
+# 在线数据集（USGS + NHC/IBTrACS + 隐患点；缓存 10 分钟）
+dataset = data_online.build_dataset(min_mag=4.5)
+
+# 自动刷新（在线大屏）：到点整页重拉数据
+if "last_refresh" not in st.session_state:
+    st.session_state["last_refresh"] = datetime.now()
+auto_on = st.sidebar.toggle("自动实时刷新（预警大屏）", value=True)
+interval = st.sidebar.select_slider("刷新间隔（秒）", options=[30, 60, 120, 300],
+                                   value=60, disabled=not auto_on)
+if auto_on:
+    import streamlit.components.v1 as _components
+    _components.html(
+        f"<script>setTimeout(function(){{window.location.reload();}}),{int(interval)*1000});</script>",
+        height=0)
+    st.sidebar.caption(f"⏱ 每 {int(interval)}s 自动刷新 · 上次 {st.session_state['last_refresh'].strftime('%H:%M:%S')}")
+st.session_state["last_refresh"] = datetime.now()
+
 
 # =====================================================================
-# 1) 实时天气数据（Open-Meteo）
+# ① 在线态势地图（统一承载：实时地震 + 台风历史轨迹 + 隐患点 + 实时天气点）
 # =====================================================================
-def tab_weather():
-    st.title("实时天气数据获取与展示")
-    st.caption("数据源：Open-Meteo（在线、免密钥）· 支持城市在线搜索")
+def tab_map():
+    st.title("在线态势地图")
+    st.caption("一张地图统一承载：实时状态（在线地震/天气）+ 历史数据（台风轨迹/隐患点）")
+
+    eq = dataset["earthquakes"]
+    ty = dataset["typhoon_tracks"]
+    spots = dataset["risk_spots"]
+
+    show_eq = st.toggle("显示实时地震（USGS）", value=True, key="m_eq")
+    show_ty = st.toggle(f"显示台风历史轨迹（{dataset['typhoon_source']}）", value=True, key="m_ty")
+    show_rs = st.toggle("显示隐患点", value=True, key="m_rs")
+
+    m = folium.Map(location=[30, 115], zoom_start=4, tiles="CARTODB_DARK")
+    folium.Element(
+        "<style>.leaflet-container{background:#0b1430} "
+        ".leaflet-popup-content-wrapper,.leaflet-popup-tip"
+        "{background:#0b1430;color:#e8edf7;border:1px solid #2c3550}</style>"
+    ).add_to(m)
+    layers = []
+
+    if show_eq and eq:
+        g = folium.FeatureGroup(name="🌏 实时地震")
+        for c in eq:
+            r = 3 + (c["magnitude"] or 0) * 1.4
+            folium.CircleMarker(location=[c["lat"], c["lon"]], radius=r,
+                                color="#ff5a4d", fill=True, fillColor="#ff5a4d",
+                                fillOpacity=.85, weight=1,
+                                popup=f"""<b>M{c['magnitude']} · {c['title']}</b><br>
+                                          {c['date']} · {c['source']}""").add_to(g)
+        g.add_to(m)
+        layers.append(g)
+
+    if show_ty and ty:
+        g = folium.FeatureGroup(name="🌀 台风历史轨迹")
+        for t in ty:
+            pts = [[p[1], p[2]] for p in t["points"]]
+            folium.PolyLine(pts, color="#3fa9ff", weight=3, dash_array="6 6").add_to(g)
+            folium.Marker(pts[0], icon=folium.Icon(color="blue", icon="info-sign"),
+                          popup=f"{t['name']} 起点").add_to(g)
+            folium.Marker(pts[-1], icon=folium.Icon(color="red", icon="flag"),
+                          popup=f"{t['name']} 登陆/终点").add_to(g)
+        g.add_to(m)
+        layers.append(g)
+
+    if show_rs and spots:
+        g = folium.FeatureGroup(name="⚠️ 隐患点")
+        for s in spots:
+            col = "#ff5a4d" if s["level"] >= 4 else "#F07C24"
+            folium.Marker([s["lat"], s["lon"]],
+                          icon=folium.DivIcon(
+                              html=(f'<div style="width:14px;height:14px;background:{col};'
+                                    f'transform:rotate(45deg);margin:4px;box-shadow:0 0 6px {col}"></div>'),
+                              icon_size=(14, 14), icon_anchor=(7, 7)),
+                          popup=f"""<b>{s['name']}</b><br>{s.get('desc','')}<br>等级：{s['level']}""").add_to(g)
+        g.add_to(m)
+        layers.append(g)
+
+    # 图层开关面板
+    if layers:
+        folium.LayerControl(collapsed=True).add_to(m)
+
+    m.fit_bounds([[min([c["lat"] for c in eq] + [s["lat"] for s in spots]) - 5,
+                   min([c["lon"] for c in eq] + [s["lon"] for s in spots]) - 5],
+                  [max([c["lat"] for c in eq] + [s["lat"] for s in spots]) + 5,
+                   max([c["lon"] for c in eq] + [s["lon"] for s in spots]) + 5]])
+    st.write(m, height=560)
+
+
+# =====================================================================
+# ② 在线搜索 · 数据整合 · 可视化
+# =====================================================================
+def tab_search_viz():
+    st.title("在线搜索 · 数据整合 · 可视化")
+    st.caption("在线拉取 → 关键词过滤 → 在线清洗/标准化 → 图表/表格/仪表盘 呈现（全在线，无本地存储）")
 
     c1, c2, c3 = st.columns([2, 1, 1])
-    with c1:
-        city = st.text_input("城市搜索（在线地理编码）", value="上海")
-    with c2:
-        lat = st.number_input("纬度", value=31.2, format="%.2f")
-    with c3:
-        lon = st.number_input("经度", value=121.4, format="%.2f")
-    use_manual = st.toggle("使用手动坐标（而非城市搜索）", value=False)
+    kw = c1.text_input("在线搜索关键词", placeholder="如：Japan / Beijing / M / Tsunami", value="")
+    geo = c2.selectbox("区域", ["全部", "中国大陆", "沿海", "日本", "东南亚"], index=0)
+    min_mag = c3.slider("最小震级", 0.0, 10.0, 4.5, 0.5)
 
-    if st.button("获取实时天气"):
-        if use_manual:
-            w = weather.get_weather(float(lat), float(lon), "手动坐标")
-        else:
-            w = weather.get_city_weather(city)
-        st.session_state["weather"] = w
+    # 在线清洗 + 过滤 + 整合 + 复盘升级（每案例 enrich：过程线/动因/可迁移/证据分级/叙事/三层视角）
+    rows = [e for e in dataset["earthquakes"] if (e.get("magnitude") or 0) >= min_mag]
+    if kw:
+        k = kw.lower()
+        rows = [e for e in rows if k in json.dumps(e, ensure_ascii=False).lower()]
+    geo_boxes = {"中国大陆": (18, 54, 73, 135), "沿海": (18, 32, 110, 125),
+                 "日本": (30, 46, 128, 146), "东南亚": (5, 25, 95, 125)}
+    if geo in geo_boxes:
+        a, b, c, d = geo_boxes[geo]
+        rows = [e for e in rows if a <= e["lat"] <= b and c <= e["lon"] <= d]
+    rows = data_online.clean_unify(rows)
+    rows = [data_online.enrich_case(e) for e in rows]  # 案例复盘三层拆解
 
-    w = st.session_state.get("weather")
-    if w and w.get("available"):
+    st.subheader(f"命中 {len(rows)} 条在线事件（清洗/去重/标准化后）")
+
+    # 仪表盘 KPI
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("事件总数", len(rows))
+    k2.metric("最大震级", f"{max((e['magnitude'] or 0) for e in rows) if rows else 0}")
+    k3.metric("≥M6", sum(1 for e in rows if (e["magnitude"] or 0) >= 6))
+    k4.metric("≥M5", sum(1 for e in rows if (e["magnitude"] or 0) >= 5))
+
+    if rows:
+        df = pd.DataFrame([{
+            "时间": e["date"], "标题": e["title"], "震级": e["magnitude"],
+            "纬度": e["lat"], "经度": e["lon"], "区域": e["region"], "来源": e["source"]}
+            for e in rows])
+
+        # 冲突叙事时间轴（平稳-冲突-应对-蜕变）
+        st.markdown("**🎬 冲突叙事时间轴**（平稳→冲突→应对→蜕变，非纯时间平铺）")
+        tl = data_online.narrative_timeline(rows)
+        if tl:
+            tl_df = pd.DataFrame([{"阶段": c.get("narrative_phase", "突发冲突"),
+                                   "时间": c["date"], "事件": c["title"]} for c in tl])
+            st.dataframe(tl_df, use_container_width=True, hide_index=True)
+
+        # 三层视角（宏观-中观-微观）
+        st.markdown("**🔍 三层视角**（政策层/地方层/现场层）")
+        l3 = data_online.three_layer_view(rows)
+        if l3:
+            l3_df = pd.DataFrame(l3)
+            st.dataframe(l3_df, use_container_width=True, hide_index=True)
+
+        # 证据来源分级（六类证据交叉印证）
+        st.markdown("**📑 证据来源分布**（六类证据交叉印证）")
+        ev = data_online.evidence_summary(rows)
+        st.dataframe(pd.DataFrame(ev), use_container_width=True, hide_index=True)
+
+        # 横向对照验证（同类灾害不同处置效果对比）
+        st.markdown("**⚖️ 横向对照验证**（同类灾害不同处置效果）")
+        cm = pd.DataFrame(data_online.comparison_matrix())
+        if not cm.empty:
+            wide = cm.pivot(index="案例", columns="维度", values="评分")
+            st.altair_chart(
+                alt.Chart(wide.reset_index()).transform_stack(
+                    pivot="维度").mark_bar().encode(
+                    x="案例:N", y="评分:Q", color="维度:N",
+                    tooltip=["案例", "维度", "评分"]),
+                use_container_width=True)
+
+        t1, t2, t3 = st.tabs(["📈 图表", "📋 表格", "📖 案例复盘卡"])
+        with t1:
+            st.markdown("**震级分布**")
+            hist = df.groupby(pd.cut(df["震级"], bins=[0, 4, 5, 6, 8, 12]))["震级"].count()
+            st.altair_chart(
+                alt.Chart(hist.reset_index())
+                .mark_bar().encode(x="bin:N", y="震级:Q", tooltip=["bin", "震级"]),
+                use_container_width=True)
+            st.markdown("**震中空间分布（在线）**")
+            chart = (alt.Chart(df.assign(lon=df["经度"], lat=df["纬度"], mag=df["震级"]))
+                     .mark_circle(size="mag")
+                     .encode(x="lon:Q", y="lat:Q", color="mag:Q",
+                              tooltip=["标题", "时间", "震级", "区域"])
+                     .properties(width=700, height=420))
+            st.altair_chart(chart, use_container_width=True)
+        with t2:
+            st.dataframe(df, use_container_width=True)
+            st.caption(f"数据源：USGS (online) · 抓取于 {dataset['fetched_at']} · 无本地缓存文件")
+        with t3:
+            st.markdown("点击案例查看 **过程线 → 动因 → 可迁移经验 + 证据强度**：")
+            sel = st.selectbox("选择案例", [r["title"] for r in rows], index=0)
+            c = next(r for r in rows if r["title"] == sel)
+            col_a, col_b = st.columns([1, 1])
+            with col_a:
+                st.markdown(f"**事件过程线**（{len(c.get('process', []))} 步）")
+                for i, s in enumerate(c.get("process", []), 1):
+                    st.markdown(f"{i}. {s}")
+                st.markdown(f"**可迁移经验**：{c.get('transferable','')}")
+            with col_b:
+                st.markdown(f"**动因分析**：{c.get('cause','')}")
+                st.markdown(f"**证据类型**：{c.get('evidence_type','')} · "
+                            f"**强度 {c.get('evidence_strength','—')}/4** · "
+                            f"**叙事阶段**：{c.get('narrative_phase','')}")
+    else:
+        st.info("未命中在线数据，换关键词或调低震级。")
+
+
+# =====================================================================
+# ③ 应急方案模块（流程 / 责任人 / 触发条件 / 处置步骤）
+# =====================================================================
+def tab_plan():
+    st.title("应急方案模块")
+    st.caption("基于 GB/T 29639-2020 三级预案体系：环节 → 触发条件 → 责任人 → 处置步骤")
+
+    plans = data_online.EMERGENCY_PLANS
+    sel = st.selectbox("选择应急环节", [p["name"] for p in plans], index=0)
+    p = next(x for x in plans if x["name"] == sel)
+
+    col_a, col_b = st.columns([1, 2])
+    with col_a:
+        st.markdown(f"**触发条件**\n{p['trigger']}")
+        st.markdown(f"**责任人**\n{p['owner']}")
+        st.markdown(f"**响应级别**\n{p['level']}")
+    with col_b:
+        st.markdown("**处置步骤**")
+        for i, s in enumerate(p["steps"], 1):
+            st.markdown(f"{i}. {s}")
+
+    st.markdown("**处置流程链**")
+    flow = pd.DataFrame({"stage": p["flow"], "owner": p["flow_owners"]})
+    chart = (alt.Chart(flow).mark_rect().encode(
+        x="stage:N", y=alt.value(1),
+        color=alt.condition(~flow["stage"].isin(["报告", "判级"]), "#4a76d9", "#F07C24"),
+        tooltip=["stage", "owner"])
+        .properties(width=560, height=120))
+    st.altair_chart(chart, use_container_width=True)
+
+
+# =====================================================================
+# ④ 实时天气仪表盘（在线 Open-Meteo）
+# =====================================================================
+def tab_weather():
+    st.title("实时天气仪表盘（在线）")
+    st.caption("在线地理编码 + Open-Meteo 实时拉取（温度/风速/降水/湿度）· 无本地存储")
+
+    city = st.text_input("城市（在线搜索）", value="北京")
+    coord = data_online.geocode_online(city.strip())
+    if coord:
+        lat, lon, name = coord[0], coord[1], coord[2]
+    else:
+        lat, lon, name = 39.9, 116.4, city
+        st.warning("在线地理编码未命中，使用默认坐标 (39.9, 116.4)")
+
+    w = data_online.fetch_weather(lat, lon, name)
+    if w.get("available"):
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("温度", f"{w['temperature_2m']} °C")
-        k2.metric("风速", f"{w['wind_speed_10m']} m/s",
-                  delta=weather.wind_level_cn(w["wind_speed_10m"]))
+        k2.metric("风速", f"{w['wind_speed_10m']} m/s")
         k3.metric("降水", f"{w['precipitation']} mm")
-        k4.metric("湿度", f"{w.get('relative_humidity_2m','—')} %")
+        k4.metric("湿度", f"{w.get('relative_humidity_2m', '—')} %")
         st.info(f"城市：{w['city']} · 观测时间：{w['time']} · 来源：{w['source']}")
 
-        # 数据萃取：把天气拉成表格供查看
-        st.dataframe(
-            [{"温度°C": w["temperature_2m"], "风速m/s": w["wind_speed_10m"],
-              "降水mm": w["precipitation"], "湿度%": w.get("relative_humidity_2m"),
-              "风级描述": weather.wind_level_cn(w["wind_speed_10m"])}])
-    elif w:
-        st.warning(f"天气获取失败：{w.get('error')}")
-
-    # 在线请求示例
-    with st.expander("📡 在线请求示例（可直接复制）"):
-        st.code(f"""
-# Open-Meteo 实时天气（免密钥）
-GET https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}\\
-&current=temperature_2m,wind_speed_10m,precipitation&timezone=auto
-
-# 城市名地理编码
-GET https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language=zh
-""")
+        # 在线可视化：天气仪表盘
+        df = pd.DataFrame([
+            {"项": "温度(°C)", "值": w["temperature_2m"]},
+            {"项": "风速(m/s)", "值": w["wind_speed_10m"]},
+            {"项": "降水(mm)", "值": w["precipitation"]},
+            {"项": "湿度(%)", "值": w.get("relative_humidity_2m", 0)},
+        ])
+        st.altair_chart(
+            alt.Chart(df).mark_bar().encode(
+                x="项:N", y="值:Q", color="项:N",
+                tooltip=["项", "值"]).properties(width=560, height=320),
+            use_container_width=True)
+    else:
+        st.warning(f"在线天气获取失败：{w.get('error')}")
 
 
-# =====================================================================
-# 2) 灾害案例地图（5 类 + 双向联动 + 筛选）
-# =====================================================================
-COLORS = {"台风": "#1E6FD9", "地震": "#D6261F", "泥石流": "#8a5f00",
-          "爆炸": "#F07C24", "火灾": "#D6261F"}
-
-def tab_map():
-    st.title("灾害案例地图 · 5 类分类 + 双向联动")
-    st.caption("地图标记 ↔ 案例列表 点击联动 · 支持 分类/时间/位置 筛选 · 点击标记查看详情")
-
-    cases = st.session_state.setdefault("cases", [])
-    if not cases:
-        cases = disasters.load_cases()
-        st.session_state["cases"] = cases
-
-    # 侧栏筛选
-    with st.sidebar:
-        st.subheader("筛选")
-        sel_cats = st.multiselect("灾害分类", disasters.CATEGORIES,
-                                  default=disasters.CATEGORIES, key="cats")
-        min_mag = st.slider("最小震级（地震）", 0.0, 10.0, 4.5, 0.1)
-        start_d = st.date_input("起始日期", None, key="sd")
-        end_d = st.date_input("截止日期", None, key="ed")
-        geo_mode = st.radio("位置范围", ["全部", "中国大陆", "中国沿海", "日本", "东南亚", "全球"],
-                            key="geo")
-
-    # 应用筛选
-    lat_min, lat_max, lon_min, lon_max = -90, 90, -180, 180
-    if geo_mode == "中国大陆":
-        lat_min, lat_max, lon_min, lon_max = 18, 54, 73, 135
-    elif geo_mode == "中国沿海":
-        lat_min, lat_max, lon_min, lon_max = 18, 32, 110, 125
-    elif geo_mode == "日本":
-        lat_min, lat_max, lon_min, lon_max = 30, 46, 128, 146
-    elif geo_mode == "东南亚":
-        lat_min, lat_max, lon_min, lon_max = 5, 25, 95, 125
-
-    sd = start_d.strftime("%Y-%m-%d") if start_d else None
-    ed = end_d.strftime("%Y-%m-%d") if end_d else None
-
-    filtered = [c for c in disasters.filter_cases(
-        cases, categories=sel_cats, start_date=sd, end_date=ed,
-        lat_min=lat_min, lat_max=lat_max, lon_min=lon_min, lon_max=lon_max)
-        if (c.get("magnitude") is None or c.get("magnitude") >= min_mag)]
-    st.session_state["filtered"] = filtered
-
-    col_map, col_list = st.columns([3, 2])
-
-    # ---- 地图 ----
-    with col_map:
-        show_eq = st.toggle("显示地震点", value=True, key="t_eq")
-        show_hz = st.toggle("显示灾害点", value=True, key="t_hz")
-        show_path = st.toggle("显示台风路径", value=True, key="t_path")
-        show_risk = st.toggle("显示隐患点", value=True, key="t_risk")
-
-        m = folium.Map(location=[30, 110], zoom_start=4, tiles="CARTODBPOSITRON")
-        # 地震 + 灾害点
-        for c in filtered:
-            if c["category"] == "地震" and not show_eq:
-                continue
-            if c["category"] != "地震" and not show_hz:
-                continue
-            color = COLORS.get(c["category"], "#5a6b7b")
-            r = 6 + (c.get("magnitude") or 0) * 1.5
-            folium.CircleMarker(
-                location=[c["lat"], c["lon"]], radius=r,
-                color=color, fill=True, fillColor=color, fillOpacity=0.7,
-                popup=f'<b>{c["title"]}</b><br>{c["date"]} · {c["source"]}',
-            ).add_to(m)
-        # 台风路径（IBTrACS 在线/内置）
-        if show_path:
-            tracks = disasters.fetch_typhoon_tracks()
-            for t in tracks:
-                pts = [[p[1], p[2]] for p in t["points"]]
-                folium.polyline(locations=pts, color="#1E6FD9", weight=3,
-                                 tooltip=t["name"]).add_to(m)
-                folium.Marker(pts[0], popup=t["name"] + "（起点）").add_to(m)
-                folium.Marker(pts[-1], icon=folium.Icon(color="red"),
-                              popup=t["name"] + "（登陆点）").add_to(m)
-        # 隐患点
-        if show_risk:
-            for spot in disasters.RISK_SPOTS:
-                col = "#D6261F" if spot["level"] >= 4 else "#F07C24"
-                folium.Marker([spot["lat"], spot["lon"]],
-                              icon=folium.Icon(color="orange", icon="diamond"),
-                              popup=f'<b>{spot["name"]}</b><br>{spot["desc"]}'
-                              ).add_to(m)
-
-        m.fit_bounds([[min(c['lat'] for c in filtered), min(c['lon'] for c in filtered)],
-                       [max(c['lat'] for c in filtered), max(c['lon'] for c in filtered)]]
-                      if filtered else None)
-        folium.Element(
-            "<style>#map_div{width:100%;height:560px}#map_div iframe{width:100%;height:560px}</style>"
-        ).add_to(m, name="style")
-        st.write(m, height=580)
-
-        # 地图 marker 点击 → 联动选中（folium 内联 JS）
-        if filtered:
-            st.write(m, height=580, key=f"map_{len(filtered)}")
-
-    # ---- 案例列表（按时间倒序）----
-    with col_list:
-        st.subheader(f"案例列表（{len(filtered)} 条，点击展开详情）")
-        for i, c in enumerate(sorted(filtered, key=lambda x: x["date"], reverse=True)[:40]):
-            with st.expander(f"{c['date']} · {c['category']} · {c['title'][:24]}"):
-                st.caption(f"坐标 ({c['lat']:.2f}, {c['lon']:.2f}) · 来源：{c['source']}")
-                st.write(c["desc"])
-                if c.get("magnitude"):
-                    st.markdown(f"**震级/强度**：{c['magnitude']}")
-                if st.button(f"在地图上定位 #{i}", key=f"loc_{i}"):
-                    st.session_state["focus_case"] = c
-                if st.button("查看详情", key=f"det_{i}"):
-                    st.session_state["focus_case"] = c
-
-    # 联动展示选中详情
-    focus = st.session_state.get("focus_case")
-    if focus:
-        with st.expander("📌 选中案例详情", expanded=True):
-            c = focus
-            st.markdown(f"**{c['category']} · {c['title']}**  \n日期：{c['date']} · "
-                        f"位置：({c['lat']:.2f}, {c['lon']:.2f}) · 来源：{c['source']}")
-            st.write(c["desc"])
-            st.caption("时间轴位置：" + c["date"])
-            if st.button("清除选中"):
-                st.session_state.pop("focus_case", None)
-
-    # 数据萃取
-    if filtered:
-        st.subheader("📤 数据萃取")
-        rows = [{
-            "分类": c["category"], "标题": c["title"], "日期": c["date"],
-            "纬度": c["lat"], "经度": c["lon"],
-            "震级/强度": c.get("magnitude"), "来源": c["source"], "描述": c["desc"],
-        } for c in filtered]
-        st.download_button("导出 CSV", json.dumps(rows, ensure_ascii=False).encode("utf-8"),
-                           "灾害案例.csv", mime="text/csv")
-
-
-# =====================================================================
-# 3) 在线搜索与数据萃取
-# =====================================================================
-def tab_search():
-    st.title("在线搜索与数据萃取")
-    kw = st.text_input("关键词搜索（标题/来源/描述）", placeholder="如：台风 / 瓦斯 / 贝鲁特")
-    cases = st.session_state.get("cases") or disasters.load_cases()
-    st.session_state["cases"] = cases
-    hits = [c for c in cases if kw and kw in json.dumps(c, ensure_ascii=False)] \
-        if kw else cases[:20]
-    st.subheader(f"命中 {len(hits)} 条")
-    for c in hits:
-        with st.expander(f"{c['date']} · {c['category']} · {c['title']}"):
-            st.write(c["desc"])
-            st.caption(f"来源：{c['source']} · ({c['lat']:.2f}, {c['lon']:.2f})")
-
-
-# =====================================================================
-# 4) 数据统计
-# =====================================================================
-def tab_stats():
-    st.title("数据统计")
-    cases = st.session_state.get("cases") or disasters.load_cases()
-    st.session_state["cases"] = cases
-    by_cat = {}
-    for c in cases:
-        by_cat[c["category"]] = by_cat.get(c["category"], 0) + 1
-    st.bar_chart(by_cat)
-    st.write(f"共 {len(cases)} 条案例 · 数据源：USGS 在线 + 内置案例库")
-
-
-# ---------- 路由 ----------
-if tab.startswith("⚡"):
-    tab_weather()
+# ---------------- 主流程 ----------------
+tab = st.sidebar.radio("模块",
+                       ["🔍 在线搜索·可视化", "🗺 在线态势地图", "🧭 应急方案模块", "⚡ 实时天气仪表盘"],
+                       index=0)
+if tab.startswith("🔍"):
+    tab_search_viz()
 elif tab.startswith("🗺"):
     tab_map()
-elif tab.startswith("🔍"):
-    tab_search()
+elif tab.startswith("🧭"):
+    tab_plan()
 else:
-    tab_stats()
+    tab_weather()
