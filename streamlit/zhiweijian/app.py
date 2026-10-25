@@ -20,10 +20,10 @@ from folium import Map, Marker
 import disasters
 import weather
 
-st.set_page_config(page_title="知危鉴 · 灾害风险预警平台", layout="wide")
+st.set_page_config(page_title="知危鉴 · 应急风险预警与案例复盘平台", layout="wide")
 
 # ---------- 品牌 ----------
-st.sidebar.title("知危鉴 ZhiWeiJian")
+st.sidebar.title("知危鉴")
 st.sidebar.caption("子品牌：CaseRescue 知灾析策 · 应急案例智能处理助手")
 st.sidebar.divider()
 
