@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知危鉴 · 知灾析策 — 应急风险预警与案例复盘平台</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6f9; --card:#fff; --line:#e4e9f0; --ink:#1f2d3d; --sub:#5a6b7b;
+  --blue:#1E6FD9; --yellow:#F5C518; --orange:#F07C24; --red:#D6261F; --green:#2e9e5b; --brand:#0f3b8f;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+.topbar{background:linear-gradient(90deg,#0b2a6b,#1455c4);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
+.topbar .logo{font-size:21px;font-weight:800;letter-spacing:1px}
+.topbar .sub{font-size:12px;opacity:.85}
+.topbar .tag{margin-left:auto;font-size:12px;background:rgba(255,255,255,.16);padding:5px 12px;border-radius:20px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#3ddc84;display:inline-block;margin-right:5px;animation:pulse 1.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,132,.7)}70%{box-shadow:0 0 0 8px rgba(61,220,132,0)}100%{box-shadow:0 0 0 0 rgba(61,220,132,0)}}
+.layout{display:grid;grid-template-columns:196px 1fr;min-height:calc(100vh - 60px)}
+nav{background:var(--card);border-right:1px solid var(--line);padding:14px 0}
+nav a{display:flex;align-items:center;gap:10px;padding:12px 20px;color:var(--sub);text-decoration:none;font-size:15px;border-left:3px solid transparent}
+nav a.active,nav a:hover{color:var(--brand);border-left-color:var(--brand);background:#eef4ff}
+main{padding:18px 22px;overflow:auto}
+h1{font-size:20px;margin:0 0 4px}
+.desc{color:var(--sub);font-size:13px;margin-bottom:16px}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(5,1fr)}
+.cols2{grid-template-columns:1.5fr 1fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h3{margin:0 0 10px;font-size:14px;display:flex;align-items:center;gap:8px}
+.kpi{font-size:25px;font-weight:800;font-variant-numeric:tabular-nums;transition:color .3s}
+.kpi.bump{animation:bump .6s ease}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.18);color:var(--red)}100%{transform:scale(1)}}
+.kpi .lbl{font-size:12px;color:var(--sub);font-weight:400;margin-top:3px}
+.up{color:var(--red)} .down{color:var(--green)}
+.chart{height:290px;width:100%}
+.mapbox{height:430px;width:100%}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+th{background:#f7f9fc;color:var(--sub);font-weight:600;position:sticky;top:0}
+.lv{display:inline-block;padding:2px 9px;border-radius:12px;color:#fff;font-size:12px;font-weight:700;white-space:nowrap}
+.lv.B{background:var(--blue)} .lv.Y{background:var(--yellow);color:#7a5c00} .lv.O{background:var(--orange)} .lv.R{background:var(--red)}
+.chip{display:inline-block;background:#eef4ff;color:var(--brand);border-radius:6px;padding:2px 8px;font-size:12px;margin:2px}
+.search{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.search input{flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+button.primary{padding:10px 18px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer}
+button.ghost{padding:10px 16px;background:#fff;color:var(--brand);border:1px solid var(--brand);border-radius:8px;font-size:14px;cursor:pointer}
+.ccard{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:#fff}
+.ccard h4{margin:0 0 6px;font-size:15px}
+.ccard .meta{font-size:12px;color:var(--sub);margin-bottom:8px}
+.ccard .blk{margin-top:8px;font-size:13px}
+.ccard .blk b{color:var(--brand)}
+.ccard ul{margin:4px 0;padding-left:18px}
+.sim{font-size:11px;background:#e9f7ef;color:#1f7a4d;padding:2px 7px;border-radius:6px;margin-left:6px}
+.hidden{display:none}
+.riskform{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:center}
+.riskform select,.riskform input{padding:8px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+/* 推送通知 */
+.toast-area{position:fixed;right:18px;top:70px;z-index:999;display:flex;flex-direction:column;gap:10px;width:330px}
+.toast{background:#fff;border-left:5px solid var(--orange);border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(15,59,143,.18);font-size:13px;animation:slideIn .35s ease}
+.toast.R{border-left-color:var(--red)} .toast.O{border-left-color:var(--orange)}
+.toast.Y{border-left-color:var(--yellow)} .toast.B{border-left-color:var(--blue)}
+.toast b{display:block;margin-bottom:3px}
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+/* 天气条 */
+.weatherbar{display:flex;gap:16px;align-items:center;font-size:13px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:10px;padding:9px 14px;margin-bottom:14px;flex-wrap:wrap}
+.weatherbar .w{font-weight:700;color:var(--brand)}
+/* 时间线 */
+.timeline{max-height:260px;overflow:auto;font-size:13px}
+.tl-item{display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.tl-item .t{color:var(--sub);font-variant-numeric:tabular-nums;min-width:62px}
+.report{background:#fbfcfe;border:1px dashed #cfe0ff;border-radius:10px;padding:14px}
+.report h4{margin:0 0 8px;font-size:15px;color:var(--brand)}
+.report ul{margin:6px 0;padding-left:20px;font-size:13px}
+@media(max-width:980px){.layout{grid-template-columns:1fr}nav{display:none}.kpis{grid-template-columns:repeat(2,1fr)}.cols2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <div class="logo">知危鉴 <span style="font-weight:400;font-size:12px">ZhiWeiJian · 应急风险预警平台</span></div>
+    <div class="sub">子品牌：CaseRescue 知灾析策 — 应急案例智能处理助手</div>
+  </div>
+  <div class="tag"><span class="live-dot"></span>实时监测中</div>
+</div>
+<div class="toast-area" id="toast-area"></div>
+<div class="layout">
+  <nav>
+    <a href="#" class="active" data-page="dash">态势地图</a>
+    <a href="#" data-page="risk">风险识别</a>
+    <a href="#" data-page="alert">预警中心</a>
+    <a href="#" data-page="case">案例复盘</a>
+  </nav>
+  <main>
+    <!-- 态势地图 -->
+    <section id="page-dash">
+      <h1>全域态势地图</h1>
+      <div class="desc">多源监测 · 实时风险指数 · 预警实时推送（地图/气象接真实数据，指标为实时模拟）</div>
+      <div class="weatherbar" id="weatherbar">正在获取真实气象数据…</div>
+      <div class="grid kpis" style="margin-bottom:14px">
+        <div class="card"><div class="kpi" id="k-alert">0</div><div class="lbl">当前预警事件</div></div>
+        <div class="card"><div class="kpi" id="k-red">0</div><div class="lbl">橙/红重大预警</div></div>
+        <div class="card"><div class="kpi" id="k-metric">4</div><div class="lbl">监测点位</div></div>
+        <div class="card"><div class="kpi" id="k-tick">0</div><div class="lbl">实时推送帧</div></div>
+        <div class="card"><div class="kpi" id="k-case">0</div><div class="lbl">案例知识卡片</div></div>
+      </div>
+      <div class="grid cols2">
+        <div class="card"><h3>全国风险分级地图 <span style="font-weight:400;font-size:11px;color:var(--sub)">（点击省份查看）</span></h3><div id="c-map" class="mapbox"></div></div>
+        <div class="card"><h3>实时指标跳动</h3><div id="live-list"></div></div>
+      </div>
+      <div class="grid cols2" style="margin-top:14px">
+        <div class="card"><h3>实时趋势（降雨 / 风速）</h3><div id="c-trend" class="chart"></div></div>
+        <div class="card"><h3>预警时间线</h3><div class="timeline" id="timeline"></div></div>
+      </div>
+    </section>
+
+    <!-- 风险识别 -->
+    <section id="page-risk" class="hidden">
+      <h1>多维风险识别</h1>
+      <div class="desc">选灾害类型与区域，按维度打分，引擎加权定级并给出处置建议</div>
+      <div class="card">
+        <div class="riskform">
+          <select id="f-hazard">
+            <option value="flood">洪涝</option><option value="geology">地质灾害</option>
+            <option value="fire">火灾</option><option value="storm">台风</option>
+          </select>
+          <input id="f-region" value="演示区域" style="width:150px">
+          <label>致灾强度<input type="number" id="f-int" min="0" max="100" value="80" style="width:74px;margin-left:6px"></label>
+          <label>暴露度<input type="number" id="f-exp" min="0" max="100" value="70" style="width:74px;margin-left:6px"></label>
+          <label>防灾准备度<input type="number" id="f-pre" min="0" max="100" value="45" style="width:74px;margin-left:6px"></label>
+          <button class="primary" id="f-go">计算风险</button>
+        </div>
+        <div id="risk-result"></div>
+        <div id="c-risk-dims" style="height:240px"></div>
+      </div>
+    </section>
+
+    <!-- 预警中心 -->
+    <section id="page-alert" class="hidden">
+      <h1>预警中心</h1>
+      <div class="desc">监测指标按预警规则自动匹配分级（蓝/黄/橙/红），实时刷新</div>
+      <div class="card" style="margin-bottom:14px"><table id="alert-table"><thead>
+        <tr><th>区域</th><th>灾害</th><th>指标</th><th>当前值</th><th>阈值</th><th>等级</th><th>状态</th></tr>
+      </thead><tbody></tbody></table></div>
+      <div class="card"><h3>预警规则配置</h3><table id="rule-table"><thead>
+        <tr><th>规则</th><th>指标</th><th>触发条件</th><th>预警等级</th><th>说明</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <!-- 案例复盘 -->
+    <section id="page-case" class="hidden">
+      <h1>案例复盘 · 知灾析策</h1>
+      <div class="desc">向量 RAG 语义检索（TF-IDF 余弦）+ AI 分析报告生成</div>
+      <div class="search">
+        <input id="case-kw" placeholder="输入关键词，支持多词：瓦斯 煤矿 / 爆炸 化工 / 索道 高处">
+        <button class="primary" id="case-btn">RAG 检索</button>
+        <button class="ghost" id="report-btn">生成 AI 分析报告</button>
+      </div>
+      <div id="report-box"></div>
+      <div id="case-list"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const API_BASE = "";
+const LEVEL_CN={1:'蓝色',2:'黄色',3:'橙色',4:'红色'};
+const LEVEL_CLS={1:'B',2:'Y',3:'O',4:'R'};
+const HZ_CN={flood:'洪涝',geology:'地质灾害',fire:'火灾',storm:'台风'};
+const METRIC_CN={rainfall_24h:'24h降雨',slope_displacement:'边坡位移',fire_risk_index:'火险指数',wind_speed:'风速'};
+
+async function fetchJson(path){
+  try{ const r=await fetch((API_BASE||"")+path); if(!r.ok) throw 0; return await r.json(); }
+  catch(e){ return null; }
+}
+
+// 内置兜底数据
+let METRICS=[
+  {region:'A 区',hazard:'flood',metric:'rainfall_24h',value:142,unit:'mm'},
+  {region:'B 区',hazard:'geology',metric:'slope_displacement',value:12.5,unit:'mm/24h'},
+  {region:'C 区',hazard:'fire',metric:'fire_risk_index',value:71,unit:'idx'},
+  {region:'沿海',hazard:'storm',metric:'wind_speed',value:24.6,unit:'m/s'},
+];
+let RULES=[
+  {id:'R-F1',name:'特大降雨预警',hazard:'flood',metric:'rainfall_24h',threshold:120,op:'>=',triggers:4,desc:'24h 降雨≥120mm'},
+  {id:'R-F2',name:'大雨预警',hazard:'flood',metric:'rainfall_24h',threshold:50,op:'>=',triggers:2,desc:'24h 降雨≥50mm'},
+  {id:'R-G1',name:'边坡位移超限',hazard:'geology',metric:'slope_displacement',threshold:10,op:'>=',triggers:3,desc:'24h 位移≥10mm'},
+  {id:'R-FR1',name:'火灾高风险',hazard:'fire',metric:'fire_risk_index',threshold:60,op:'>=',triggers:3,desc:'火险指数≥60'},
+  {id:'R-S1',name:'大风预警',hazard:'storm',metric:'wind_speed',threshold:17.5,op:'>=',triggers:2,desc:'风速≥17.5m/s'},
+];
+let CASES=[];
+let caseLoaded=false, liveTicks=0, es=null;
+const charts={};
+
+// ---------- 导航 ----------
+document.querySelectorAll('nav a').forEach(a=>a.onclick=e=>{
+  e.preventDefault();
+  document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));
+  a.classList.add('active');
+  document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('page-'+a.dataset.page).classList.remove('hidden');
+  if(a.dataset.page==='dash' && charts['c-map']) setTimeout(()=>charts['c-map'].resize(),60);
+  if(a.dataset.page==='case' && !caseLoaded) loadCases();
+});
+
+// ---------- 本地风险引擎（后端不可用时兜底） ----------
+const WEIGHTS={flood:{exposure:.35,hazard_intensity:.40,preparedness:.15,vulnerability:.10},
+  geology:{exposure:.25,hazard_intensity:.45,slope:.15,preparedness:.15},
+  fire:{exposure:.20,hazard_intensity:.35,dryness:.25,preparedness:.20},
+  storm:{exposure:.30,hazard_intensity:.40,preparedness:.15,vulnerability:.15}};
+function riskLocal(hazard,region,sig){
+  const w=WEIGHTS[hazard]||WEIGHTS.flood; let t=0,ws=0; const dims=[];
+  for(const k in w){const v=parseFloat(sig[k]||0);t+=v*w[k];ws+=w[k];dims.push({key:k,label:k,value:v});}
+  const score=ws?t/ws:0; let lv=1; if(score>=80)lv=4;else if(score>=60)lv=3;else if(score>=40)lv=2;
+  const sug={flood:'加密水文监测、预置转移路线与避灾点、检查排涝设备、低洼区域预警转移',
+    geology:'开展山坡体巡查、警戒地质灾害隐患点、雨季停工与临危人员撤离预案',
+    fire:'清理可燃物、排查电气与动火作业、预置灭火器材、管控火源与隔离带',
+    storm:'加固临时设施、停工停运、沿海居民转移、关注风暴潮与强降雨次生灾害'}[hazard];
+  return {score:Math.round(score*10)/10,level:lv,dims,suggested:sug};
+}
+
+// ---------- 推送通知 ----------
+const toastArea=document.getElementById('toast-area');
+function toast(level,title,detail){
+  const el=document.createElement('div');
+  el.className='toast '+LEVEL_CLS[level];
+  el.innerHTML=`<b>${LEVEL_CN[level]}预警 · ${title}</b><span>${detail}</span>`;
+  toastArea.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),400)},5200);
+}
+// 只对"新出现/升级"的预警弹通知，避免刷屏
+const seenAlerts=new Map();
+function notifyAlerts(alerts){
+  alerts.forEach(a=>{
+    const key=a.id; const prev=seenAlerts.get(key);
+    if(!prev || prev<a.level){ toast(a.level,a.rule_name,`${a.region} ${a.metric} = ${a.value}（阈值 ${a.threshold}）`); }
+    seenAlerts.set(key,a.level);
+  });
+}
+
+// ---------- 地图 ----------
+let mapInited=false;
+async function initMap(){
+  const el=document.getElementById('c-map'); if(!el) return;
+  charts['c-map']=echarts.init(el);
+  charts['c-map'].showLoading({text:'加载地图…',color:'#1455c4'});
+  const geo=await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json').then(r=>r.json()).catch(()=>null);
+  if(!geo){ charts['c-map'].hideLoading(); el.innerHTML='<div style="padding:40px;text-align:center;color:#5a6b7b">地图数据不可达（离线环境），其他功能正常</div>'; return; }
+  echarts.registerMap('china', geo);
+  charts['c-map'].hideLoading();
+  mapInited=true;
+  renderMap();
+}
+function renderMap(){
+  if(!charts['c-map']) return;
+  // 依据监测指标给重点省着色（演示：把 4 个风险映射到代表性省份）
+  const riskByProv={'广东省':4,'四川省':3,'北京市':3,'浙江省':3,'河南省':3,'黑龙江省':3,'台湾省':4,'香港特别行政区':3,'澳门特别行政区':3};
+  const data=Object.keys(riskByProv).map(p=>({name:p,value:riskByProv[p]}));
+  charts['c-map'].setOption({
+    tooltip:{formatter:p=>{
+      const lv=riskByProv[p.name]||0;
+      return `${p.name}<br/>${lv?('风险等级：'+LEVEL_CN[lv]):'暂无监测'}`;
+    }},
+    visualMap:{min:1,max:4,left:14,bottom:14,text:['红','蓝'],calculable:false,
+      inRange:{color:['#1E6FD9','#F5C518','#F07C24','#D6261F']},textStyle:{fontSize:11}},
+    series:[{type:'map',map:'china',roam:true,label:{show:false},
+      emphasis:{label:{show:true,fontSize:11},itemStyle:{areaColor:'#ffd666'}},
+      itemStyle:{borderColor:'#b9c6d8',borderWidth:.6,areaColor:'#eef2f8'},
+      data}]
+  });
+  charts['c-map'].off('click');
+  charts['c-map'].on('click',p=>{
+    const lv=riskByProv[p.name]||1;
+    toast(lv,'区域点击 · '+p.name, lv>1?`该省纳入重点监测，当前风险等级 ${LEVEL_CN[lv]}`:'该省暂无高等级预警');
+  });
+}
+
+// ---------- 实时跳动 ----------
+function renderLiveList(metrics,alerts){
+  const box=document.getElementById('live-list');
+  const map={}; alerts.forEach(a=>{map[a.region+a.metric]=a;});
+  box.innerHTML=metrics.map(m=>{
+    const a=map[m.region+m.metric];
+    const lv=a?a.level:1;
+    const color=lv>=4?'var(--red)':lv===3?'var(--orange)':lv===2?'#b58900':'var(--blue)';
+    const val=m.value!=null?m.value:'--';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)">
+      <div><div style="font-size:13px">${m.region} · ${METRIC_CN[m.metric]||m.metric}</div>
+      <div style="font-size:11px;color:var(--sub)">${HZ_CN[m.hazard]||m.hazard} · 阈值 ${a?a.threshold:'—'}</div></div>
+      <div style="text-align:right"><div class="kpi" style="font-size:19px;color:${color}">${val}</div>
+      <span class="lv ${LEVEL_CLS[lv]}">${a?LEVEL_CN[lv]:'正常'}</span></div>
+    </div>`;
+  }).join('');
+}
+function bumpKpi(id,val){
+  const el=document.getElementById(id); if(!el)return;
+  const old=parseInt(el.textContent)||0;
+  el.textContent=val;
+  if(val!==old){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+}
+function renderTimeline(alerts){
+  const tl=document.getElementById('timeline');
+  alerts.slice(0,12).forEach(a=>{
+    const d=document.createElement('div');
+    d.className='tl-item';
+    d.innerHTML=`<span class="t">${a.ts||'--:--'}</span>
+      <span><span class="lv ${LEVEL_CLS[a.level]}">${LEVEL_CN[a.level]}</span> ${a.rule_name} · ${a.region} ${a.value}</span>`;
+    tl.prepend(d);
+  });
+  while(tl.children.length>24) tl.lastChild.remove();
+}
+
+let trendSeries={rain:[],wind:[]}, trendLabels=[];
+function pushTrend(metrics){
+  const r=metrics.find(m=>m.metric==='rainfall_24h');
+  const w=metrics.find(m=>m.metric==='wind_speed');
+  trendLabels.push('t'+(++liveTicks));
+  trendSeries.rain.push(r?r.value:null);
+  trendSeries.wind.push(w?w.value:null);
+  if(trendLabels.length>14){trendLabels.shift();trendSeries.rain.shift();trendSeries.wind.shift();}
+  if(!charts['c-trend']) charts['c-trend']=echarts.init(document.getElementById('c-trend'));
+  charts['c-trend'].setOption({
+    grid:{left:44,right:44,top:34,bottom:26},legend:{top:0,textStyle:{fontSize:11}},
+    xAxis:{type:'category',data:trendLabels,axisLabel:{fontSize:10}},
+    yAxis:[{type:'value',name:'mm',axisLabel:{fontSize:10}},{type:'value',name:'m/s',axisLabel:{fontSize:10}}],
+    tooltip:{trigger:'axis'},
+    series:[
+      {name:'24h降雨(mm)',type:'line',smooth:true,showSymbol:false,data:trendSeries.rain,lineStyle:{width:2}},
+      {name:'风速(m/s)',type:'line',smooth:true,showSymbol:false,yAxisIndex:1,data:trendSeries.wind,lineStyle:{width:2,type:'dashed'}}
+    ]
+  },{notMerge:false});
+}
+
+// ---------- SSE 连接（失败自动回退轮询） ----------
+function startLive(){
+  if(es) return;
+  try{
+    es=new EventSource((API_BASE||'')+'/api/monitor/live');
+    es.onmessage=ev=>{
+      const p=JSON.parse(ev.data);
+      bumpKpi('k-tick',p.ts||(liveTicks+1));
+      METRICS=p.metrics.map(m=>({...m}));
+      const alerts=p.alerts||[];
+      bumpKpi('k-alert',alerts.length);
+      bumpKpi('k-red',alerts.filter(a=>a.level>=3).length);
+      renderLiveList(METRICS,alerts);
+      renderAlertTable(METRICS,alerts);
+      renderTimeline(alerts);
+      pushTrend(METRICS);
+      notifyAlerts(alerts);
+    };
+    es.onerror=()=>{ if(es){es.close();es=null;} };
+  }catch(e){}
+}
+
+// ---------- 天气 ----------
+async function loadWeather(){
+  const bar=document.getElementById('weatherbar');
+  bar.innerHTML='<span class="live-dot"></span> 正在获取真实气象数据…';
+  const w=await fetchJson('/api/weather?lat=39.9&lon=116.4&city=北京');
+  if(w && w.available){
+    bar.innerHTML=`<span>🌦 真实气象 · <b>北京</b>（Open-Meteo）</span>
+      <span>温度 <span class="w">${w.temperature_2m}°C</span></span>
+      <span>风速 <span class="w">${w.wind_speed_10m} m/s</span></span>
+      <span>降水 <span class="w">${w.precipitation} mm</span></span>
+      <span style="color:var(--sub)">观测时间 ${w.time}</span>`;
+  }else{
+    bar.innerHTML='<span style="color:var(--sub)">真实气象接口暂不可达（离线环境），其余功能正常</span>';
+  }
+}
+
+// ---------- 预警表 ----------
+function renderAlertTable(metrics,alerts){
+  const tb=document.querySelector('#alert-table tbody'); if(!tb)return;
+  const map={}; (alerts||[]).forEach(a=>map[a.region+a.metric]=a);
+  tb.innerHTML=metrics.map(m=>{
+    const a=map[m.region+m.metric];
+    return `<tr><td>${m.region}</td><td>${HZ_CN[m.hazard]||m.hazard}</td><td>${METRIC_CN[m.metric]||m.metric}</td>
+      <td><b>${m.value}</b> ${m.unit||''}</td><td>${a?a.threshold:'—'}</td>
+      <td>${a?`<span class="lv ${LEVEL_CLS[a.level]}">${LEVEL_CN[a.level]}</span>`:'<span style="color:var(--green)">正常</span>'}</td>
+      <td>${a?'active':'—'}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" style="color:var(--sub)">等待实时数据…</td></tr>';
+}
+function renderRuleTable(){
+  const tb=document.querySelector('#rule-table tbody');
+  tb.innerHTML=RULES.map(r=>`<tr><td>${r.name}</td><td>${METRIC_CN[r.metric]||r.metric}</td>
+    <td>${r.op||'>='} ${r.threshold}</td>
+    <td><span class="lv ${LEVEL_CLS[r.triggers]}">${LEVEL_CN[r.triggers]}</span></td>
+    <td style="color:var(--sub)">${r.desc||''}</td></tr>`).join('');
+}
+
+// ---------- 风险识别 ----------
+document.getElementById('f-go').onclick=async()=>{
+  const hazard=document.getElementById('f-hazard').value;
+  const region=document.getElementById('f-region').value||'演示区域';
+  const signals={hazard_intensity:+document.getElementById('f-int').value,
+    exposure:+document.getElementById('f-exp').value,
+    preparedness:+document.getElementById('f-pre').value,
+    vulnerability:50,slope:50,dryness:50};
+  let data=null;
+  try{
+    const r=await fetch((API_BASE||'')+'/api/risk',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({hazard,region,signals})});
+    if(r.ok) data=await r.json();
+  }catch(e){}
+  if(!data) data=riskLocal(hazard,region,signals);
+  const lv=data.level, sug=data.suggested||'';
+  document.getElementById('risk-result').innerHTML=`
+    <div style="display:flex;align-items:center;gap:18px;margin:6px 0 10px">
+      <div style="font-size:36px;font-weight:800;color:${lv>=3?'#D6261F':lv===2?'#F07C24':'#1E6FD9'}">${data.score}</div>
+      <div><span class="lv ${LEVEL_CLS[lv]}">${LEVEL_CN[lv]}预警</span>　<b>${HZ_CN[hazard]}</b> · ${region}</div>
+    </div>
+    <div style="font-size:13px;color:var(--sub)">处置建议：${sug}${lv>=4?'（已达最高响应级别，建议启动应急预案并联动外部救援力量。）':''}</div>`;
+  const dims=data.dims||[];
+  if(charts['c-risk-dims']) charts['c-risk-dims'].dispose();
+  charts['c-risk-dims']=echarts.init(document.getElementById('c-risk-dims'));
+  charts['c-risk-dims'].setOption({
+    grid:{left:96,right:26,top:16,bottom:24},
+    xAxis:{type:'value',max:100},
+    yAxis:{type:'category',data:dims.map(d=>d.label||d.key)},tooltip:{},
+    series:[{type:'bar',data:dims.map(d=>d.value),barWidth:16,
+      itemStyle:{color:'#1455c4',borderRadius:[0,6,6,0]},
+      label:{show:true,position:'right',fontSize:11}}]}); 
+};
+
+// ---------- RAG 检索 + 报告 ----------
+function caseCard(c,sim){
+  const simTag=sim!=null?`<span class="sim">相似度 ${sim}</span>`:'';
+  return `<div class="ccard">
+    <h4>${c.title} ${simTag} <span class="lv ${c.level==='特别重大'?'R':c.level==='重大'?'O':'Y'}">${c.level||''}</span></h4>
+    <div class="meta">${c.date||''} · ${c.location||''}</div>
+    <div class="blk"><b>事件概况</b>：${c.summary||''}</div>
+    <div class="blk"><b>风险因素</b><ul>${(c.risk_factors||[]).map(x=>'<li>'+x+'</li>').join('')}</ul></div>
+    <div class="blk"><b>应急处置措施</b><ul>${(c.measures||[]).map(x=>'<li>'+x+'</li>').join('')}</ul></div>
+    <div class="blk"><b>经验教训</b><ul>${(c.lessons||[]).map(x=>'<li>'+x+'</li>').join('')}</ul></div>
+    <div>${(c.tags||[]).map(t=>'<span class="chip">'+t+'</span>').join('')}</div>
+  </div>`;
+}
+async function loadCases(){
+  const remote=await fetchJson('/api/cases?keyword=&top_k=20');
+  if(Array.isArray(remote)&&remote.length) CASES=remote;
+  caseLoaded=true; doSearch(document.getElementById('case-kw').value||'');
+}
+async function doSearch(kw){
+  const list=document.getElementById('case-list');
+  list.innerHTML='<div class="card" style="color:var(--sub)">检索中…</div>';
+  // 优先走 RAG
+  const rag=await fetchJson('/api/cases/rag?keyword='+encodeURIComponent(kw)+'&top_k=3');
+  if(Array.isArray(rag)&&rag.length){
+    list.innerHTML=rag.map(x=>caseCard(x.case,x.similarity)).join('');
+    return;
+  }
+  // 回退本地关键词
+  if(!CASES.length) CASES=await fetchJson('/api/cases?keyword=&top_k=20')||[];
+  const kwL=(kw||'').toLowerCase();
+  const hits=CASES.filter(c=>!kwL||JSON.stringify(c).toLowerCase().includes(kwL)).slice(0,3);
+  list.innerHTML=hits.length?hits.map(c=>caseCard(c)).join(''):'<div class="card">未检索到匹配案例，换个关键词试试。</div>';
+}
+document.getElementById('case-btn').onclick=()=>doSearch(document.getElementById('case-kw').value);
+document.getElementById('case-kw').onkeydown=e=>{if(e.key==='Enter')doSearch(document.getElementById('case-kw').value)};
+
+document.getElementById('report-btn').onclick=async()=>{
+  const kw=document.getElementById('case-kw').value||'爆炸';
+  const box=document.getElementById('report-box');
+  box.innerHTML='<div class="card" style="color:var(--sub)">AI 正在生成分析报告…</div>';
+  const rep=await fetchJson('/api/cases/report?keyword='+encodeURIComponent(kw));
+  if(!rep){box.innerHTML='<div class="card">报告服务不可达。</div>';return;}
+  box.innerHTML=`<div class="report">
+    <h4>AI 分析报告 · 「${rep.query}」</h4>
+    <div style="font-size:13px;margin-bottom:8px">${rep.headline}</div>
+    ${rep.risk?`<div style="font-size:13px;margin-bottom:8px">当前风险：<b>${HZ_CN[rep.risk.hazard]||rep.risk.hazard}</b> · ${rep.risk.region} · 指数 <b>${rep.risk.score}</b> · <span class="lv ${LEVEL_CLS[rep.risk.level]}">${LEVEL_CN[rep.risk.level]}</span></div>`:''}
+    <div style="font-size:13px;font-weight:700;margin-top:8px">建议处置动作</div>
+    <ul>${(rep.key_actions||[]).map(a=>'<li>'+a+'</li>').join('')}</ul>
+    <div style="font-size:13px;font-weight:700;margin-top:8px">相似案例</div>
+    <ul>${(rep.hits||[]).map(h=>`<li>${h.title} <span class="sim">${h.similarity}</span></li>`).join('')}</ul>
+    <div style="font-size:11px;color:var(--sub);margin-top:8px">${rep.notes||''}</div>
+  </div>`;
+};
+
+// ---------- 启动 ----------
+(async function boot(){
+  renderRuleTable();
+  loadWeather();
+  initMap();
+  // 首屏用一次静态数据填充
+  const [m,r,a]=await Promise.all([
+    fetchJson('/api/monitor/metrics'), fetchJson('/api/monitor/rules'), fetchJson('/api/monitor/alerts')]);
+  if(Array.isArray(m)&&m.length) METRICS=m;
+  if(Array.isArray(r)&&r.length) RULES=r;
+  if(Array.isArray(a)){ renderLiveList(METRICS,a); renderAlertTable(METRICS,a); renderTimeline(a);
+    bumpKpi('k-alert',a.length); bumpKpi('k-red',a.filter(x=>x.level>=3).length); }
+  renderRuleTable();
+  bumpKpi('k-metric',METRICS.length);
+  // 案例数
+  const cs=await fetchJson('/api/cases?keyword=&top_k=20');
+  if(Array.isArray(cs)){ CASES=cs; caseLoaded=true; bumpKpi('k-case',cs.length); doSearch(''); }
+  startLive();
+  window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+})();
+</script>
+</body>
+</html>

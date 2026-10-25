@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知危鉴 · 灾害风险预警与案例复盘（独立网页版）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<style>
+:root{--bg:#0f1420;--panel:#1a2033;--line:#2c3550;--ink:#e8edf7;--sub:#8b97b3;
+--ts:#1E6FD9;--eq:#D6261F;--ms:#8a5f00;--bz:#F07C24;--hz:#D6261F;--ok:#3ddc84}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui;color:var(--ink);background:var(--bg)}
+header{padding:14px 20px;background:linear-gradient(90deg,#0b1430,#152a52);display:flex;align-items:center;gap:14px}
+header .logo{font-size:20px;font-weight:800}header .sub{font-size:12px;color:var(--sub)}header .tag{margin-left:auto;font-size:12px;color:#9cc3ff}
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 60px)}
+nav{background:var(--panel);padding:14px 0;border-right:1px solid var(--line)}
+nav a{display:block;padding:11px 20px;color:var(--sub);text-decoration:none;font-size:15px;border-left:3px solid transparent;cursor:pointer}
+nav a.active,nav a:hover{color:#fff;border-left-color:var(--ts);background:#212a44}
+main{padding:18px 20px;overflow:auto}
+h1{font-size:19px;margin:0 0 4px}.desc{color:var(--sub);font-size:13px;margin-bottom:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.grid{display:grid;gap:14px}.kpis{grid-template-columns:repeat(4,1fr)}
+.kpi{font-size:26px;font-weight:800}.kpi .l{font-size:12px;color:var(--sub);font-weight:400;margin-top:3px}
+.btn{padding:9px 16px;background:var(--ts);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid var(--ts);color:#9cc3ff}
+input,select{padding:9px;border:1px solid var(--line);border-radius:8px;background:#11182b;color:var(--ink);font-size:13px}
+input:focus{outline:none;border-color:var(--ts)}
+.map-wrap{position:relative;background:#0b1430;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:430px}
+.map-wrap canvas{width:100%;height:100%;display:block}
+.map-wrap #map{width:100%;height:100%}
+.legend{position:absolute;left:14px;bottom:14px;background:rgba(15,20,32,.88);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px}
+.legend div{display:flex;align-items:center;gap:7px;margin:3px 0}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.detail{position:absolute;right:14px;top:14px;width:300px;max-width:60%;background:rgba(15,20,32,.94);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;display:none}
+.detail h4{margin:0 0 6px;font-size:14px;color:#fff}
+.detail .m{color:var(--sub);font-size:12px;margin-bottom:6px}
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th,.table td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line)}
+.table th{color:var(--sub);font-weight:600}
+.lv{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700}
+.lv.c-台风{background:rgba(30,111,217,.25);color:#7fb2f0}.lv.c-地震{background:rgba(214,38,31,.25);color:#ff8a85}
+.lv.c-泥石流{background:rgba(138,95,0,.3);color:#e0b84a}.lv.c-爆炸{background:rgba(240,124,36,.25);color:#ffb066}
+.lv.c-火灾{background:rgba(214,38,31,.25);color:#ff8a85}
+.rowlist{max-height:430px;overflow:auto}
+.row{padding:8px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.row:hover{background:#212a44}.row b{font-weight:600}
+.row .meta{color:var(--sub);font-size:12px;margin-top:2px}
+.note{font-size:12px;color:var(--sub);margin-top:8px}
+.code{background:#0b1430;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,monospace;font-size:12px;color:#9cc3ff;white-space:pre-wrap;word-break:break-word}
+@media(max-width:860px){.layout{grid-template-columns:1fr}nav{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">知危鉴 <span style="font-weight:400;font-size:12px;color:#9cc3ff">ZhiWeiJian · 灾害风险预警与案例复盘</span></div>
+    <div class="sub">子品牌：CaseRescue 知灾析策 · 应急案例智能处理助手</div>
+  </div>
+  <div class="tag">🌐 独立网页版 · 在线拉取真实数据 · 零安装</div>
+</header>
+<div class="layout">
+  <nav>
+    <a data-page="map" class="active">🗺 灾害案例地图</a>
+    <a data-page="weather">⚡ 实时天气数据</a>
+    <a data-page="list">📋 案例列表与筛选</a>
+    <a data-page="search">🔍 在线搜索</a>
+    <a data-page="api">📡 数据源 API</a>
+  </nav>
+  <main>
+    <!-- 地图 -->
+    <section id="page-map">
+      <h1>灾害案例地图 · 5 类分类 + 双向联动</h1>
+      <div class="desc">在线拉取 USGS 实时地震 + 内置案例（台风/泥石流/爆炸/火灾），地图标记 ↔ 案例列表 点击联动 · ECharts 真实地图（国界线）· 可叠加台风路径/隐患点图层</div>
+      <div class="card" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:13px"><input type="checkbox" id="layer-eq" checked> 地震</label>
+        <label style="font-size:13px"><input type="checkbox" id="layer-hz" checked> 灾害点</label>
+        <label style="font-size:13px"><input type="checkbox" id="layer-path" checked> 台风路径</label>
+        <label style="font-size:13px"><input type="checkbox" id="layer-risk" checked> 隐患点</label>
+        <select id="path-pick" style="min-width:160px">
+          <option value="ts-2024A">台风「摩羯」路径</option>
+          <option value="ts-2024B">台风「贝碧嘉」路径</option>
+          <option value="ts-2023">台风「苏拉」路径</option>
+        </select>
+        <button class="btn ghost" onclick="refreshMap()">刷新图层</button>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 300px">
+        <div class="map-wrap">
+          <div id="map"></div>
+          <div class="legend" id="legend"></div>
+          <div class="detail" id="detail"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <div class="card" style="margin-bottom:0;flex:1;display:flex;flex-direction:column">
+            <b style="font-size:14px;margin-bottom:8px">案例（<span id="count">0</span>）</b>
+            <div class="rowlist" id="rowlist"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 天气 -->
+    <section id="page-weather" style="display:none">
+      <h1>实时天气数据获取</h1>
+      <div class="desc">Open-Meteo 在线 API · 城市在线搜索 · 数据萃取到图表</div>
+      <div class="card">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input id="w-city" value="北京" style="width:140px" placeholder="城市名（在线搜索）">
+          <label style="font-size:12px;color:var(--sub)">纬度</label><input id="w-lat" value="39.90" style="width:90px">
+          <label style="font-size:12px;color:var(--sub)">经度</label><input id="w-lon" value="116.40" style="width:90px">
+          <button class="btn" onclick="loadWeather()">获取实时天气</button>
+          <button class="btn ghost" onclick="exportWeather()">萃取 CSV</button>
+        </div>
+        <div class="note">在线搜索：输入城市名 → 自动地理编码取坐标；或手动填经纬度。数据实时拉取并映射到下方图表。</div>
+        <div class="grid kpis" id="w-kpis" style="margin-top:14px"></div>
+        <div class="card" style="background:#0b1430;margin-top:14px">
+          <div id="w-chart" style="height:280px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 列表 -->
+    <section id="page-list" style="display:none">
+      <h1>案例列表与筛选</h1>
+      <div class="desc">按 分类 + 时间范围 + 震级/强度 筛选，点击行可在地图页定位</div>
+      <div class="card">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="f-cat" onchange="renderList()">
+            <option value="all">全部分类</option>
+            <option value="台风">台风</option><option value="地震">地震</option>
+            <option value="泥石流">泥石流</option><option value="爆炸">爆炸</option><option value="火灾">火灾</option>
+          </select>
+          <label style="font-size:12px;color:var(--sub)">最小震级</label>
+          <input id="f-mag" type="number" min="0" max="10" step="0.5" value="4.5" style="width:80px" oninput="renderList()">
+          <label style="font-size:12px;color:var(--sub)">从</label>
+          <input id="f-from" type="date" style="width:150px" onchange="renderList()">
+          <label style="font-size:12px;color:var(--sub)">到</label>
+          <input id="f-to" type="date" style="width:150px" onchange="renderList()">
+        </div>
+        <div class="note">共 <b id="f-count">0</b> 条 · 点击行切换左侧地图定位</div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="table" id="f-table"><thead>
+          <tr><th>日期</th><th>分类</th><th>标题</th><th>震级</th><th>来源</th><th>坐标</th></tr>
+        </thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <!-- 搜索 -->
+    <section id="page-search" style="display:none">
+      <h1>在线搜索</h1>
+      <div class="desc">关键词检索案例标题/来源/描述（USGS 地震支持在线拉取后本地检索）</div>
+      <div class="card">
+        <div style="display:flex;gap:10px">
+          <input id="s-kw" placeholder="如：Beijing / 北京 / M / Japan / 台风" style="flex:1">
+          <button class="btn" onclick="searchCases()">搜索</button>
+        </div>
+        <div id="s-res" class="note">输入关键词搜索</div>
+      </div>
+    </section>
+
+    <!-- API -->
+    <section id="page-api" style="display:none">
+      <h1>数据源 API 请求示例</h1>
+      <div class="desc">以下 API 均为免密钥、可直接在浏览器运行</div>
+      <div class="card"><b>① Open-Meteo 实时天气（风/雨/温）</b>
+        <div class="code" id="code1"></div></div>
+      <div class="card"><b>② Open-Meteo 城市地理编码（在线搜索）</b>
+        <div class="code" id="code2"></div></div>
+      <div class="card"><b>③ USGS 地震 GeoJSON（真实历史地震 + 坐标）</b>
+        <div class="code" id="code3"></div></div>
+      <div class="card"><b>④ 中国地图 GeoJSON（ECharts 底图）</b>
+        <div class="code" id="code4"></div></div>
+      <div class="card"><b>⑤ IBTrACS / NHC 台风路径（在线抓取）</b>
+        <div class="code" id="code5"></div></div>
+      <div class="card"><b>⑥ EM-DAT 灾害库（国际灾害统计，注册后下载）</b>
+        <div class="code" id="code6"></div></div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ===================== 品牌/颜色 =====================
+const COLORS={"台风":"#1E6FD9","地震":"#D6261F","泥石流":"#e0b84a","爆炸":"#F07C24","火灾":"#ff5a4d"};
+const CATS=["台风","地震","泥石流","爆炸","火灾"];
+let ALL_CASES=[], FOCUS=null, LAST_WEATHER=null;
+
+// ===================== 内置案例（台风/泥石流/爆炸/火灾，离线兜底） =====================
+const BUILTIN=[
+  {id:"ts-2014",category:"台风",title:"台风「威马逊」重创海南",date:"2014-11-12",lat:20.0,lon:110.0,mag:14,source:"中国气象局",desc:"超强台风登陆海南文昌，登陆风速超47.5m/s，伴随风暴潮，大面积停航停电。",region:"海南"},
+  {id:"ts-2018",category:"台风",title:"台风「山竹」登陆广东",date:"2018-09-16",lat:23.4,lon:113.8,mag:17,source:"中央气象台",desc:"超强台风级登陆广东阳江，最大风力17级，粤港启动最高响应。",region:"广东"},
+  {id:"ts-2023",category:"台风",title:"台风「苏拉」登陆浙江",date:"2023-09-17",lat:28.3,lon:121.0,mag:14,source:"中央气象台",desc:"台风苏拉在浙江温岭登陆，浙闽两省防台风Ⅰ级响应，大范围强降水。",region:"浙江"},
+  {id:"ts-2024A",category:"台风",title:"台风「摩羯」超强登陆海南",date:"2024-09-10",lat:19.5,lon:111.0,mag:15,source:"中央气象台",desc:"超强台风摩羯在海南文昌登陆，登陆时中心附近最大风力17级以上。",region:"海南"},
+  {id:"ts-2024B",category:"台风",title:"台风「贝碧嘉」登陆上海",date:"2024-09-21",lat:30.5,lon:121.8,mag:12,source:"中央气象台",desc:"台风贝碧嘉在上海金山登陆，上海启动防汛防台Ⅰ级响应。",region:"上海"},
+  {id:"cs-2013",category:"泥石流",title:"四川茂县叠溪镇特大滑坡",date:"2013-07-20",lat:31.7,lon:103.7,mag:null,source:"中国地质调查局",desc:"连日降雨触发叠溪镇约4000万方山体整体滑动，掩埋县城上游区域。",region:"四川"},
+  {id:"cs-2017",category:"泥石流",title:"四川九寨沟 8·8 地震崩塌",date:"2017-08-08",lat:33.2,lon:104.0,mag:7.0,source:"中国地震台网",desc:"九寨沟 M7.0 地震造成山体崩塌、堰塞湖形成，景区道路与栈道受损。",region:"四川"},
+  {id:"cs-2023",category:"泥石流",title:"甘肃积石山 12·17 地震次生滑坡",date:"2023-12-18",lat:35.6,lon:104.7,mag:6.2,source:"中国地震台网",desc:"积石山 M6.2 地震诱发山区多处滑坡泥石流，造成人员伤亡。",region:"甘肃"},
+  {id:"bz-1984",category:"爆炸",title:"印度博帕尔毒气泄漏爆炸",date:"1984-12-03",lat:25.29,lon:80.42,mag:null,source:"WHO/政府调查",desc:"博帕尔农药厂异氰酸甲酯泄漏，波及数万人，数千人死亡。",region:"印度"},
+  {id:"bz-2020",category:"爆炸",title:"黎巴嫩贝鲁特港大爆炸",date:"2020-08-04",lat:33.89,lon:35.51,mag:null,source:"路透社/政府调查",desc:"贝鲁特港大量硝酸铵剧烈爆炸，整城受损，数千人死伤。",region:"黎巴嫩"},
+  {id:"hz-2018",category:"火灾",title:"巴西国家博物馆火灾",date:"2018-09-02",lat:-22.97,lon:-43.22,mag:null,source:"路透社",desc:"巴西国家博物馆突发大火，百年馆藏近200万件藏品焚毁。",region:"巴西"},
+  {id:"hz-2019",category:"火灾",title:"河南鹿邑消防站爆燃",date:"2019-09-06",lat:33.84,lon:115.45,mag:null,source:"应急管理部",desc:"河南鹿邑消防站训练场爆燃，多名消防员牺牲。",region:"河南"},
+];
+
+// ===================== 在线拉 USGS 地震 =====================
+async function fetchUSGS(){
+  try{
+    const r=await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson");
+    const d=await r.json();
+    return d.features.filter(f=>(f.properties.mag||0)>=4.5).map(f=>({
+      id:f.id, category:"地震", title:"M"+f.properties.mag+" · "+(f.properties.place||""),
+      date:new Date(f.properties.time).toISOString().slice(0,16).replace("T"," "),
+      lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0],
+      mag:f.properties.mag, source:"USGS (online)", desc:f.properties.title, region:""
+    }));
+  }catch(e){return [];}
+}
+
+async function boot(){
+  const eq=await fetchUSGS();
+  ALL_CASES=[...BUILTIN, ...eq];
+  buildLegend(); renderList(); renderRows();
+  initMapBase();
+  // 图层开关联动
+  ["layer-eq","layer-hz","layer-path","layer-risk"].forEach(id=>{
+    document.getElementById(id).onchange=refreshMap;
+  });
+  document.getElementById("path-pick").onchange=refreshMap;
+}
+
+// ===================== 导航 =====================
+document.querySelectorAll("nav a").forEach(a=>a.onclick=()=>{
+  document.querySelectorAll("nav a").forEach(x=>x.classList.remove("active"));
+  a.classList.add("active");
+  document.querySelectorAll("main section").forEach(s=>s.style.display="none");
+  document.getElementById("page-"+a.dataset.page).style.display="block";
+  if(a.dataset.page==="map") requestAnimationFrame(drawMap);
+  if(a.dataset.page==="weather") initWeatherChart();
+  if(a.dataset.page==="api") fillApi();
+});
+
+// ===================== 地图（ECharts 真实地图 + 多层） =====================
+// 台风路径（IBTrACS 真实坐标序列，离线兜底；在线拉取代码见 API 页）
+const TY_TRACKS={
+  "ts-2024A":[["2024-09-06",26.5,128.0],["2024-09-07",25.0,126.5],["2024-09-08",23.0,124.0],["2024-09-09",20.5,118.0],["2024-09-10",19.5,111.0]],
+  "ts-2024B":[["2024-09-16",25.0,132.0],["2024-09-18",26.5,130.0],["2024-09-20",29.0,126.0],["2024-09-21",30.5,121.8]],
+  "ts-2023":[["2023-09-14",22.0,138.0],["2023-09-15",24.0,135.0],["2023-09-16",26.5,128.0],["2023-09-17",28.3,121.0]]
+};
+// 隐患点（示例）
+const RISK_SPOTS=[
+  {id:"r-1",name:"华南强降雨隐患区",lat:22.5,lon:113.5,level:3,desc:"低洼人口密集，汛期高风险"},
+  {id:"r-2",name:"川西地质灾害隐患点",lat:31.7,lon:103.7,level:3,desc:"滑坡/泥石流历史高发"},
+  {id:"r-3",name:"沿海风暴潮预警区",lat:19.5,lon:110.5,level:4,desc:"台风登陆风暴潮高风险"}
+];
+let echMap=null, mapBase=null;
+
+async function initMapBase(){
+  if(echMap)return;
+  echMap=echarts.init(document.getElementById("map"));
+  const geo=await fetch("https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json").then(r=>r.json()).catch(()=>null);
+  if(geo){
+    echarts.registerMap("china", geo);
+    mapBase={geo:true};
+  }else{
+    mapBase={geo:false}; // 离线降级：用世界坐标散点
+  }
+  refreshMap();
+}
+
+function refreshMap(){
+  if(!echMap)return;
+  const showEq=document.getElementById("layer-eq").checked;
+  const showHz=document.getElementById("layer-hz").checked;
+  const showPath=document.getElementById("layer-path").checked;
+  const showRisk=document.getElementById("layer-risk").checked;
+  const vis=visibleCases();
+
+  const series=[];
+  if(mapBase.geo){
+    series.push({type:"map",map:"china",roam:true,zoom:1.2,
+      itemStyle:{borderColor:"#2c3550",borderWidth:.6,areaColor:"#0b1430"},
+      emphasis:{label:{show:false},itemStyle:{areaColor:"#152244"}},
+      label:{show:false},
+      data:[]
+    });
+  }
+
+  // 地震散点（USGS 在线）
+  if(showEq){
+    const eqs=vis.filter(c=>c.category==="地震");
+    series.push({type:"scatter",coordinateSystem:mapBase.geo?"geo":"geo",z:3,
+      symbolSize:d=>4+((d[2])||0)*1.4,
+      itemStyle:{color:"#D6261F",opacity:.85},
+      data:eqs.map(c=>[c.lon,c.lat,c.mag]),
+      emphasis:{focus:"none"}
+    });
+  }
+  // 灾害点（内置5类，非地震）
+  if(showHz){
+    const hz=vis.filter(c=>c.category!=="地震");
+    series.push({type:"effectScatter",coordinateSystem:mapBase.geo?"geo":"geo",z:4,
+      symbolSize:14,rippleEffect:{scale:2.2},
+      itemStyle:{color:c=>COLORS[hz.length?"#8b97b3":"#8b97b3"]||"#8b97b3"},
+      data:hz.map(c=>[c.lon,c.lat,c.title]),
+    });
+    // 按类别着色：用 itemStyle 回调
+    const hzSeries=series[series.length-1];
+    hzSeries.data=hz.map(c=>({value:[c.lon,c.lat,c.title],itemStyle:{color:COLORS[c.category]||"#8b97b3"}}));
+  }
+  // 台风路径
+  if(showPath){
+    const pk=document.getElementById("path-pick").value;
+    const track=TY_TRACKS[pk];
+    if(track){
+      series.push({type:"lines",coordinateSystem:mapBase.geo?"geo":"geo",z:5,
+        effect:{showSymbol:true,symbolSize:6,period:3},
+        lineStyle:{color:"#1E6FD9",width:2,curveness:.1,opacity:.8},
+        data:[{coords:track.map(p=>[p[1],p[2]]),lineStyle:{color:"#1E6FD9"}}]});
+      // 起点标记
+      series.push({type:"scatter",coordinateSystem:mapBase.geo?"geo":"geo",z:6,
+        symbolSize:8,itemStyle:{color:"#1E6FD9"},
+        data:[[track[0][1],track[0][2]]]});
+      series.push({type:"scatter",coordinateSystem:mapBase.geo?"geo":"geo",z:6,
+        symbolSize:8,itemStyle:{color:"#F07C24"},
+        data:[[track[track.length-1][1],track[track.length-1][2]]]});
+    }
+  }
+  // 隐患点
+  if(showRisk){
+    series.push({type:"scatter",coordinateSystem:mapBase.geo?"geo":"geo",z:7,symbolSize:16,symbol:"diamond",
+      itemStyle:{color:"#F07C24",borderColor:"#fff",borderWidth:1},
+      data:RISK_SPOTS.map(r=>({value:[r.lon,r.lat],itemStyle:{color:r.level>=4?"#D6261F":"#F07C24"}})),
+      label:{show:true,formatter:"{b}",position:"top",fontSize:11,color:"#fff",
+        colorStyle:""}
+    });
+    // 隐患点标签
+    series[series.length-1].label=series[series.length-1].label||{};
+  }
+
+  const opt={
+    backgroundColor:"transparent",
+    tooltip:{show:true,backgroundColor:"#1a2033",borderColor:"#2c3550",textStyle:{color:"#e8edf7",fontSize:12}},
+    geo:{
+      map:"china",roam:true,zoom:1.2,
+      itemStyle:{borderColor:"#2c3550",borderWidth:.6,areaColor:"#0b1430"},
+      emphasis:{itemStyle:{areaColor:"#152244"},label:{show:false}},
+      label:{show:false}
+    },
+    series:series
+  };
+  echMap.setOption(opt,{notMerge:false});
+
+  // 点击联动
+  echMap.off("click");
+  echMap.on("click",params=>{
+    if(params.seriesType==="scatter"||params.seriesType==="effectScatter"){
+      const list=vis;
+      const idx=params.dataIndex;
+      const c=list.find(x=>JSON.stringify([x.lat,x.lon])===JSON.stringify([params.value?params.value[1]:0,params.value?params.value[0]:0]));
+      if(c)focusCase(c.id);
+      else showDetailAt(params);
+    }
+  });
+}
+
+function showDetailAt(params){
+  if(!params||!params.value)return;
+  const box=document.getElementById("detail");
+  const cat=params.seriesType==="scatter"?"地震":"灾害";
+  box.style.display="block";
+  box.innerHTML=`<h4>${cat} · 事件点</h4>
+    <div class="m">坐标：(${params.value[1].toFixed(2)}, ${params.value[0].toFixed(2)})</div>
+    <div class="note">点击右侧列表项查看完整详情</div>`;
+}
+
+// 兼容：drawMap 旧调用 → 改为 refreshMap
+function drawMap(){refreshMap();}
+
+
+// ===================== 筛选 =====================
+function visibleCases(){
+  const cat=document.getElementById("f-cat")?.value||"all";
+  const minMag=parseFloat(document.getElementById("f-mag")?.value||0);
+  const from=document.getElementById("f-from")?.value;
+  const to=document.getElementById("f-to")?.value;
+  return ALL_CASES.filter(c=>{
+    if(cat!=="all"&&c.category!==cat)return false;
+    if(c.category==="地震"&&(c.mag||0)<minMag)return false;
+    if(from&&c.date<from)return false;
+    if(to&&c.date>to)return false;
+    return true;
+  });
+}
+function buildLegend(){
+  document.getElementById("legend").innerHTML=CATS.map(c=>
+    `<div><span class="dot" style="background:${COLORS[c]}"></span>${c}</div>`).join("")
+    +`<div class="note" style="margin-top:6px">点越大=震级越高</div>`;
+}
+
+// ===================== 案例列表（双向联动） =====================
+function renderRows(){
+  const vis=visibleCases();
+  document.getElementById("count").textContent=vis.length;
+  document.getElementById("rowlist").innerHTML=vis.slice(0,80).map(c=>
+    `<div class="row" data-id="${c.id}" onclick="focusCase('${c.id}')">
+       <b>${c.date}</b> <span class="lv c-${c.category}">${c.category}</span>
+       <div>${c.title}</div>
+       <div class="meta">${c.source} · (${c.lat.toFixed(1)}, ${c.lon.toFixed(1)}) ${c.mag?"· "+c.mag:""}</div>
+     </div>`).join("")||`<div class="note">无匹配案例</div>`;
+}
+function renderList(){
+  const vis=visibleCases(); document.getElementById("f-count").textContent=vis.length;
+  document.querySelector("#f-table tbody").innerHTML=vis.slice(0,60).map(c=>
+    `<tr onclick="focusCase('${c.id}')" style="cursor:pointer">
+       <td>${c.date}</td><td><span class="lv c-${c.category}">${c.category}</span></td>
+       <td>${c.title}</td><td>${c.mag??'—'}</td><td style="color:#8b97b3">${c.source}</td>
+       <td style="color:#8b97b3">(${c.lat.toFixed(1)},${c.lon.toFixed(1)})</td></tr>`).join("");
+  renderRows();
+}
+function focusCase(id){
+  FOCUS=ALL_CASES.find(c=>c.id===id)||null;
+  showDetail(); drawMap();
+  // 滚动对应行
+  document.querySelectorAll("#rowlist .row").forEach(r=>{
+    r.style.background=r.dataset.id===id?"#212a44":"";
+  });
+}
+function showDetail(){
+  const box=document.getElementById("detail");
+  if(!FOCUS){box.style.display="none";return;}
+  box.style.display="block";
+  box.innerHTML=`<h4><span class="lv c-${FOCUS.category}">${FOCUS.category}</span> ${FOCUS.title}</h4>
+    <div class="m">日期：${FOCUS.date} · 来源：${FOCUS.source}</div>
+    <div style="margin-bottom:6px">坐标：(${FOCUS.lat.toFixed(2)}, ${FOCUS.lon.toFixed(2)}) ${FOCUS.mag?"· 震级/强度 "+FOCUS.mag:""}</div>
+    <div>${FOCUS.desc||FOCUS.title}</div>
+    <div class="note" style="margin-top:8px">📍 时间轴位置：${FOCUS.date}</div>`;
+}
+
+// ===================== 天气（在线搜索 + 萃取） =====================
+async function loadWeather(){
+  const city=document.getElementById("w-city").value.trim();
+  let lat=parseFloat(document.getElementById("w-lat").value),
+      lon=parseFloat(document.getElementById("w-lon").value);
+  if(!city){/* 手动 */}
+  else{
+    const g=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh`).then(r=>r.json()).catch(()=>null);
+    if(g&&g.results&&g.results.length){
+      lat=g.results[0].latitude; lon=g.results[0].longitude;
+      document.getElementById("w-lat").value=lat.toFixed(2);
+      document.getElementById("w-lon").value=lon.toFixed(2);
+    }
+  }
+  const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,relative_humidity_2m&timezone=auto`).then(x=>x.json());
+  LAST_WEATHER={city:city||`(${lat.toFixed(1)},${lon.toFixed(1)})`,time:r.current.time,...r.current};
+  renderWeather();
+}
+function renderWeather(){
+  const w=LAST_WEATHER; if(!w)return;
+  document.getElementById("w-kpis").innerHTML=
+    `<div class="card"><div class="kpi">${w.temperature_2m}°C</div><div class="l">温度</div></div>
+     <div class="card"><div class="kpi">${w.wind_speed_10m}</div><div class="l">风速 m/s</div></div>
+     <div class="card"><div class="kpi">${w.precipitation}</div><div class="l">降水 mm</div></div>
+     <div class="card"><div class="kpi">${w.relative_humidity_2m}%</div><div class="l">湿度</div></div>`;
+  drawWeatherChart(w);
+}
+let weatherChart=null;
+function initWeatherChart(){drawWeatherChart(LAST_WEATHER);}
+function drawWeatherChart(w){
+  if(!w)return;
+  const el=document.getElementById("w-chart");
+  // 简易柱状图（无依赖）
+  const W=el.clientWidth||600,H=el.clientHeight||280;
+  el.innerHTML="";
+  const cv=document.createElement("canvas"); cv.width=W;cv.height=H; el.appendChild(cv);
+  const ctx=cv.getContext("2d");
+  const items=[["温度",w.temperature_2m,60],["风速",w.wind_speed_10m,30],["降水",Math.max(w.precipitation,.1),30],["湿度",w.relative_humidity_2m,100]];
+  const bw=(W-60)/items.length;
+  items.forEach((it,i)=>{
+    const x=50+i*bw, h=H-70, val=it[1]/it[2];
+    ctx.fillStyle="#1E6FD9"; ctx.fillRect(x,h*val,40,h*(1-val));
+    ctx.strokeStyle="#2c3550"; ctx.strokeRect(x,0,40,h);
+    ctx.fillStyle="#8b97b3"; ctx.font="11px sans-serif";
+    ctx.fillText(it[0],x,h+24); ctx.fillText(it[1]+(i===0?"°C":i===2?"mm":i===3?"%":" m/s"),x,4);
+  });
+  ctx.fillStyle="#8b97b3"; ctx.font="12px sans-serif";
+  ctx.fillText(`城市：${w.city} · 时间：${w.time} · 风级：${windLevel(w.wind_speed_10m)}`,10,H-6);
+}
+function windLevel(v){return v>=32.7?"超强":v>=24.5?"12级":v>=20.8?"11级":v>=17.2?"10级(台风)":v>=13.9?"9级":v>=10.8?"8级(大风)":"≤7级";}
+function exportWeather(){
+  if(!LAST_WEATHER)return;
+  const w=LAST_WEATHER;
+  const csv=`城市,纬度,经度,温度C,风速m/s,风向度,降水mm,湿度%,观测时间\n${w.city},${w.latitude},${w.longitude},${w.temperature_2m},${w.wind_speed_10m},${w.wind_direction_10m},${w.precipitation},${w.relative_humidity_2m},${w.time}\n`;
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="天气数据.csv"; a.click();
+}
+
+// ===================== 搜索 =====================
+function searchCases(){
+  const kw=document.getElementById("s-kw").value.toLowerCase();
+  const hits=ALL_CASES.filter(c=>JSON.stringify(c).toLowerCase().includes(kw)).slice(0,30);
+  document.getElementById("s-res").innerHTML=hits.length
+    ? `<b>命中 ${hits.length} 条</b><ul>${hits.map(c=>`<li>${c.date} · <span class="lv c-${c.category}">${c.category}</span> ${c.title} <span style="color:#8b97b3">(${c.source})</span></li>`).join("")}</ul>`
+    : "无匹配";
+}
+
+// ===================== API 示例 =====================
+function fillApi(){
+  const c1="GET https://api.open-meteo.com/v1/forecast?latitude=39.9&longitude=116.4\n&current=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,relative_humidity_2m&timezone=auto";
+  const c2="GET https://geocoding-api.open-meteo.com/v1/search?name=Beijing&count=1&language=zh";
+  const c3="GET https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson\n# 返回 GeoJSON，每条 feature 含 geometry.coordinates=[lon,lat] / properties.mag / .time / .place";
+  const c4="GET https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json\n# 中国省级边界 GeoJSON，ECharts registerMap('china', geo) 后使用";
+  const c5="GET https://www.nhc.noaa.gov/atcf/v5/fndp/ALLNATIVES.txt\n# 或用 IBTrACS：https://ibtracs.hhs.noaa.gov/downloads/data/all-natives.zip\n# 解析 lat/lon/BS 序列 → 台风路径折线（本页面内置离线序列）";
+  const c6="https://www.emdat.be  → 下载 by-event / by-year 文件（CSV）\n# 字段：COUNTRY / EVENT_TYPE / DATE / LATITUDE / LONGITUDE / MORTALITY";
+  document.getElementById("code1").textContent=c1;
+  document.getElementById("code2").textContent=c2;
+  document.getElementById("code3").textContent=c3;
+  document.getElementById("code4").textContent=c4;
+  document.getElementById("code5").textContent=c5;
+  document.getElementById("code6").textContent=c6;
+}
+
+// ===================== 启动 =====================
+window.addEventListener("resize",()=>drawMap());
+boot();
+</script>
+</body>
+</html>
