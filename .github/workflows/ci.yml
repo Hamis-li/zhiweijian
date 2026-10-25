@@ -1,0 +1,37 @@
+name: zhiweijian CI
+
+# 推送 main 时自动做依赖安装自检 + 语法检查（不真正部署到 Streamlit Cloud，
+# 在线部署由 share.streamlit.io 直接指向本仓库完成；此 CI 保证代码合入前可运行）
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r streamlit/zhiweijian/requirements.txt
+
+      - name: 语法自检（py_compile）
+        run: |
+          python -m py_compile streamlit/zhiweijian/app.py
+          python -m py_compile streamlit/zhiweijian/disasters.py
+          python -m py_compile streamlit/zhiweijian/weather.py
+          echo "all modules compile OK"
+
+      - name: 后端 FastAPI 依赖自检（可选）
+        run: |
+          pip install fastapi uvicorn "pydantic>=2"
+          python -c "import sys; sys.path.insert(0,'backend'); from app.main import app; print('FastAPI OK:', app.title)"

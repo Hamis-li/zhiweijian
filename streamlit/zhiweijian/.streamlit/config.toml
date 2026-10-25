@@ -1,0 +1,20 @@
+# Streamlit Cloud / 本地 streamlit run 的统一配置
+# 放在 streamlit/zhiweijian/ 下，与 app.py 同级
+[general]
+name = "知危鉴 · 灾害风险预警与案例复盘"
+logoTitle = "知危鉴"
+email = ""
+
+[server]
+headless = true
+port = 8501
+address = "0.0.0.0"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#1E6FD9"
+backgroundColor = "#f4f6f9"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1f2d3d"
