@@ -21,7 +21,7 @@ import data_online
 st.set_page_config(page_title="知危鉴 · 应急风险预警与案例复盘平台", layout="wide",
                    page_icon="⚠️")
 st.sidebar.title("⚠️ 知危鉴")
-st.sidebar.caption("纯在线 · 灾害风险预警与案例复盘\n子品牌：CaseRescue 知灾析策")
+st.sidebar.caption("纯在线 · 灾害风险预警与案例复盘\n案例复盘模块")
 st.sidebar.divider()
 
 # ---------------- SCI 学术美感 · 明暗双模全局样式（GV 米白纸张底 + a16z 深炭黑底 + 衬线大标题 + 克制金棕品牌色）----------------
@@ -363,12 +363,63 @@ def tab_weather():
         st.warning(f"在线天气获取失败：{w.get('error')}")
 
 
+# =====================================================================
+# ⑤ 学术图组（历史灾害事件 · 分省 choropleth，Nature 系制图规范）
+# =====================================================================
+def tab_academic():
+    st.title("学术图组 · 历史灾害事件态势")
+    st.caption("数据：编纂事件集（2010–2024 重大灾害，来源：应急管理部/中国气象局/水利部/"
+               "自然资源部/USGS）+ USGS 历史地震动态补充 · 分类依据《自然灾害分类》五大类")
+
+    try:
+        from viz_academic import render_academic_figures
+        from disaster_history import load_events, filter_events, usgs_history, CATEGORIES
+    except Exception as e:
+        st.warning(f"学术图组依赖未就绪（{e}）：需 matplotlib 环境（requirements 已含）")
+        return
+
+    c1, c2, c3 = st.columns([1, 1, 2])
+    d1 = c1.date_input("时间窗 起", value=pd.Timestamp("2010-01-01").date())
+    d2 = c2.date_input("时间窗 止", value=pd.Timestamp("2024-12-31").date())
+    cats = c3.multiselect("灾害大类（五大类）", CATEGORIES, default=CATEGORIES)
+
+    with st.expander("对比时间窗（生成差值图，可选）", expanded=False):
+        use_cmp = st.toggle("启用差值图（RdBu_r：蓝=减少 红=增加）", value=False)
+        cc1, cc2 = st.columns(2)
+        e1 = cc1.date_input("对比窗 起", value=pd.Timestamp("2015-01-01").date(), disabled=not use_cmp)
+        e2 = cc2.date_input("对比窗 止", value=pd.Timestamp("2019-12-31").date(), disabled=not use_cmp)
+
+    merge_usgs = st.toggle("并入 USGS 历史地震（在线补充）", value=False)
+
+    period = (str(d1), str(d2))
+    events = filter_events(load_events(), start=period[0], end=period[1],
+                           categories=cats or None)
+    if merge_usgs:
+        events = events + usgs_history(period[0], period[1], min_mag=5.0)
+
+    compare_period = (str(e1), str(e2)) if use_cmp else None
+
+    k1, k2, k3 = st.columns(3)
+    provs = {e.get("province", "") for e in events if e.get("province")}
+    k1.metric("事件总数", len(events))
+    k2.metric("覆盖省级行政区", len(provs))
+    k3.metric("涉及大类数", len({e.get("category") for e in events}))
+
+    # viz 模块约定：compare_period 提供即自动追加差值图（对比窗事件由模块内部重算）
+    render_academic_figures(events, period=period, compare_period=compare_period)
+
+    st.caption("底图：GS(2020)4619 号标准地图（本地优先）/ 阿里 DataV GeoAtlas（云端兜底），底图无修改 · "
+               "色带：YlOrRd 顺序 / RdBu_r 发散 · 制图要素：南海诸岛 inset、九段线、指北针、比例尺")
+
+
 # ---------------- 主流程 ----------------
 tab = st.sidebar.radio("模块",
-                       ["🔍 在线搜索·可视化", "🗺 在线态势地图", "🧭 应急方案模块", "⚡ 实时天气仪表盘"],
+                       ["🔍 在线搜索·可视化", "📊 学术图组", "🗺 在线态势地图", "🧭 应急方案模块", "⚡ 实时天气仪表盘"],
                        index=0)
 if tab.startswith("🔍"):
     tab_search_viz()
+elif tab.startswith("📊"):
+    tab_academic()
 elif tab.startswith("🗺"):
     tab_map()
 elif tab.startswith("🧭"):

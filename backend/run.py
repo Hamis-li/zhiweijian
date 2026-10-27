@@ -7,7 +7,7 @@ import subprocess, sys, os
 
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    print("启动 知危鉴 · 知灾析策 后端 API ... http://127.0.0.1:8000/docs")
+    print("启动 知危鉴 后端 API ... http://127.0.0.1:8000/docs")
     subprocess.call([sys.executable, "-m", "uvicorn", "app.main:app", "--reload", "--port", "8000"])
 
 if __name__ == "__main__":

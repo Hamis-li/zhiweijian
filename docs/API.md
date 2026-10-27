@@ -1,4 +1,4 @@
-# 知危鉴 · 知灾析策 API
+# 知危鉴 API
 
 Base URL: `http://127.0.0.1:8000`（本地）/ 部署域名为 Base
 交互文档: `/docs` · OpenAPI: `/openapi.json`

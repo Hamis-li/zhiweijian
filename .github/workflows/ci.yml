@@ -27,8 +27,7 @@ jobs:
       - name: 语法自检（py_compile）
         run: |
           python -m py_compile streamlit/zhiweijian/app.py
-          python -m py_compile streamlit/zhiweijian/disasters.py
-          python -m py_compile streamlit/zhiweijian/weather.py
+          python -m py_compile streamlit/zhiweijian/data_online.py
           echo "all modules compile OK"
 
       - name: 后端 FastAPI 依赖自检（可选）

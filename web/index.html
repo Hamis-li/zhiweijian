@@ -53,7 +53,7 @@ input:focus{outline:none;border-color:var(--ts)}
 <header>
   <div>
     <div class="logo">知危鉴 <span style="font-weight:400;font-size:12px;color:#9cc3ff">ZhiWeiJian · 灾害风险预警与案例复盘</span></div>
-    <div class="sub">子品牌：CaseRescue 知灾析策 · 应急案例智能处理助手</div>
+    <div class="sub">案例复盘模块 · 应急案例智能处理助手</div>
   </div>
   <div class="tag">🌐 独立网页版 · 在线拉取真实数据 · 零安装</div>
 </header>
@@ -100,14 +100,14 @@ input:focus{outline:none;border-color:var(--ts)}
     <!-- 天气 -->
     <section id="page-weather" style="display:none">
       <h1>实时天气数据获取</h1>
-      <div class="desc">Open-Meteo 在线 API · 城市在线搜索 · 数据萃取到图表</div>
+      <div class="desc">Open-Meteo 在线 API · 城市在线搜索 · 在线数据整合到图表</div>
       <div class="card">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <input id="w-city" value="北京" style="width:140px" placeholder="城市名（在线搜索）">
           <label style="font-size:12px;color:var(--sub)">纬度</label><input id="w-lat" value="39.90" style="width:90px">
           <label style="font-size:12px;color:var(--sub)">经度</label><input id="w-lon" value="116.40" style="width:90px">
           <button class="btn" onclick="loadWeather()">获取实时天气</button>
-          <button class="btn ghost" onclick="exportWeather()">萃取 CSV</button>
+          <button class="btn ghost" onclick="exportWeather()">导出 CSV</button>
         </div>
         <div class="note">在线搜索：输入城市名 → 自动地理编码取坐标；或手动填经纬度。数据实时拉取并映射到下方图表。</div>
         <div class="grid kpis" id="w-kpis" style="margin-top:14px"></div>
@@ -433,7 +433,7 @@ function showDetail(){
     <div class="note" style="margin-top:8px">📍 时间轴位置：${FOCUS.date}</div>`;
 }
 
-// ===================== 天气（在线搜索 + 萃取） =====================
+// ===================== 天气（在线搜索 + 数据整合） =====================
 async function loadWeather(){
   const city=document.getElementById("w-city").value.trim();
   let lat=parseFloat(document.getElementById("w-lat").value),
