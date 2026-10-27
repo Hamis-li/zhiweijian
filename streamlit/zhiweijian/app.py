@@ -24,6 +24,46 @@ st.sidebar.title("⚠️ 知危鉴")
 st.sidebar.caption("纯在线 · 灾害风险预警与案例复盘\n子品牌：CaseRescue 知灾析策")
 st.sidebar.divider()
 
+# ---------------- SCI 学术美感 · 明暗双模全局样式（GV 米白纸张底 + a16z 深炭黑底 + 衬线大标题 + 克制金棕品牌色）----------------
+dark_mode = st.sidebar.toggle("深色模式（学术暗色大屏）", value=False, key="dark_mode")
+
+_SCI_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root{--primary-color:#A6761D;--background-color:#F7F8FA;--secondary-background-color:#FFFFFF;--text-color:#0A0E1A;}
+.stApp{background:#F7F8FA;font-family:'Noto Sans SC','Inter',-apple-system,Segoe UI,Roboto,sans-serif;color:#0A0E1A;}
+.stApp h1,.stApp h2,.stApp h3,.stTitle{font-family:'Noto Serif SC','Source Serif 4',Georgia,serif !important;color:#0A0E1A !important;font-weight:700 !important;letter-spacing:.01em;}
+.stSidebar,.stSidebar>div:first-child{background-color:#FCFCFD !important;border-right:1px solid #E3E8EF;}
+.stSidebar h1,.stSidebar .stTitle{color:#A6761D !important;}
+.stCaption,.stCaption p{color:#5B6478 !important;font-size:.85rem;}
+.stButton>button{background-color:#8C6014;color:#FFFFFF;border:none;border-radius:8px;font-weight:600;padding:.5rem 1rem;}
+.stButton>button:hover{background-color:#6F4B10;}
+.stMetric{background:#FFFFFF;border:1px solid #E3E8EF;border-radius:10px;padding:.6rem .8rem;}
+.stMetric label{color:#5B6478 !important;}
+code,.stCode,.stJson{font-family:'JetBrains Mono',monospace !important;}
+</style>
+"""
+
+# 深色模式覆盖层（a16z 深炭黑底招牌）
+_DARK_CSS = """
+<style>
+:root{--primary-color:#C9972E;--background-color:#0B1430;--secondary-background-color:#121B33;--text-color:#E8EDF7;}
+.stApp{background:#0B1430 !important;color:#E8EDF7 !important;}
+.stApp h1,.stApp h2,.stApp h3,.stTitle{color:#E8EDF7 !important;}
+.stSidebar,.stSidebar>div:first-child{background-color:#0E1830 !important;border-right:1px solid #2C3550 !important;}
+.stSidebar h1,.stSidebar .stTitle{color:#C9972E !important;}
+.stCaption,.stCaption p{color:#9AA6C0 !important;}
+.stButton>button{background-color:#C9972E !important;color:#0B1430 !important;}
+.stButton>button:hover{background-color:#E0B455 !important;}
+.stMetric{background:#121B33 !important;border:1px solid #2C3550 !important;}
+.stMetric label{color:#9AA6C0 !important;}
+</style>
+"""
+
+st.markdown(_SCI_CSS, unsafe_allow_html=True)
+if dark_mode:
+    st.markdown(_DARK_CSS, unsafe_allow_html=True)
+
 # 在线数据集（USGS + NHC/IBTrACS + 隐患点；缓存 10 分钟）
 dataset = data_online.build_dataset(min_mag=4.5)
 
@@ -57,11 +97,41 @@ def tab_map():
     show_ty = st.toggle(f"显示台风历史轨迹（{dataset['typhoon_source']}）", value=True, key="m_ty")
     show_rs = st.toggle("显示隐患点", value=True, key="m_rs")
 
-    m = folium.Map(location=[30, 115], zoom_start=4, tiles="CARTODB_DARK")
+    dark = st.session_state.get("dark_mode", False)
+    if dark:
+        m = folium.Map(location=[30, 115], zoom_start=4, tiles="CartoDB Dark Matter")
+        folium.Element(
+            "<style>.folium-map{position:relative !important}"
+            ".leaflet-container{background:#0b1430} "
+            ".leaflet-popup-content-wrapper,.leaflet-popup-tip"
+            "{background:#0b1430;color:#e8edf7;border:1px solid #2c3550}</style>"
+        ).add_to(m)
+    else:
+        m = folium.Map(location=[30, 115], zoom_start=4, tiles="CartoDB Positron")
+        folium.Element(
+            "<style>.folium-map{position:relative !important}"
+            ".leaflet-container{background:#eef1f5} "
+            ".leaflet-popup-content-wrapper,.leaflet-popup-tip"
+            "{background:#ffffff;color:#0a0e1a;border:1px solid #d6dbe4;"
+            "box-shadow:0 2px 8px rgba(10,14,26,.12)}"
+            ".leaflet-bar a,.leaflet-control-zoom a"
+            "{background:#fff;color:#0a0e1a;border-color:#d6dbe4}"
+            ".leaflet-control-attribution{background:rgba(255,255,255,.85);color:#5b6478}"
+            ".leaflet-control-layers{background:rgba(255,255,255,.92);color:#0a0e1a;"
+            "border:1px solid #d6dbe4}</style>"
+        ).add_to(m)
+
+    # 学术地图图例（红=地震/高危隐患，蓝=台风轨迹，琥珀=低危隐患；白卡在明暗底图均清晰）
     folium.Element(
-        "<style>.leaflet-container{background:#0b1430} "
-        ".leaflet-popup-content-wrapper,.leaflet-popup-tip"
-        "{background:#0b1430;color:#e8edf7;border:1px solid #2c3550}</style>"
+        """<div style="position:absolute;bottom:12px;left:12px;z-index:1000;
+        background:rgba(255,255,255,.92);border:1px solid #d6dbe4;border-radius:8px;
+        padding:8px 10px;font:12px/1.6 'Noto Sans SC',sans-serif;color:#0a0e1a;
+        box-shadow:0 2px 8px rgba(10,14,26,.12)">
+        <b style="font-family:'Noto Serif SC',serif">图例</b><br>
+        <span style="color:#ff5a4d">●</span> 实时地震（USGS，半径∝震级）<br>
+        <span style="color:#3fa9ff">━</span> 台风历史轨迹<br>
+        <span style="color:#ff5a4d">◆</span> 隐患点（高）&nbsp;&nbsp;
+        <span style="color:#F07C24">◆</span> 隐患点（低）</div>"""
     ).add_to(m)
     layers = []
 
@@ -96,7 +166,7 @@ def tab_map():
             folium.Marker([s["lat"], s["lon"]],
                           icon=folium.DivIcon(
                               html=(f'<div style="width:14px;height:14px;background:{col};'
-                                    f'transform:rotate(45deg);margin:4px;box-shadow:0 0 6px {col}"></div>'),
+                                    f'transform:rotate(45deg);margin:4px"></div>'),
                               icon_size=(14, 14), icon_anchor=(7, 7)),
                           popup=f"""<b>{s['name']}</b><br>{s.get('desc','')}<br>等级：{s['level']}""").add_to(g)
         g.add_to(m)

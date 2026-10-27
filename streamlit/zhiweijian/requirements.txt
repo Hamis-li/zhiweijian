@@ -1,4 +1,4 @@
 streamlit>=1.30
-folium>=0.15
+folium>=0.15,<0.18
 altair>=5.0
 pandas>=2.0
