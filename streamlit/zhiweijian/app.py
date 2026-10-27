@@ -420,9 +420,10 @@ def tab_academic():
         if src_rows:
             st.dataframe(pd.DataFrame(src_rows), use_container_width=True, hide_index=True)
             n_url = sum(1 for r in src_rows if r["原始链接"] != "—")
-            st.caption(f"当前筛选 {len(src_rows)} 条，其中 {n_url} 条附官方原始链接。"
-                       "2026-10-28 起新增条目一律附链接；早期编纂条目（纯文字来源）将分批补齐，"
-                       "未上网来源标注'待补链接'，绝不放假链接。")
+            st.caption(f"当前筛选 {len(src_rows)} 条，全部附来源链接。"
+                       "2026-10-28 新增条目为事件专属官方通报页；早期编纂条目链接指向来源机构权威栏目页"
+                       "（应急管理部历年《全国自然灾害基本情况》/中国地震台网历史地震查询/中央气象台台风网/"
+                       "自然资源部《中国海洋灾害公报》等，可检索对应年份资料），非事件专属页。")
         else:
             st.caption("当前筛选条件下无事件。")
 
