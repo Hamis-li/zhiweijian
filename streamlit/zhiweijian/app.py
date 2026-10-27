@@ -368,7 +368,7 @@ def tab_weather():
 # =====================================================================
 def tab_academic():
     st.title("灾害数据可视化 · 历史灾害事件态势")
-    st.caption("数据：编纂事件集（2010–2024 重大灾害，来源：应急管理部/中国气象局/水利部/"
+    st.caption("数据：编纂事件集（2009–2026 重大灾害，来源：应急管理部/中国气象局/水利部/"
                "自然资源部/USGS）+ USGS 历史地震动态补充 · 分类依据《自然灾害分类》五大类")
 
     try:
@@ -379,8 +379,8 @@ def tab_academic():
         return
 
     c1, c2, c3 = st.columns([1, 1, 2])
-    d1 = c1.date_input("时间窗 起", value=pd.Timestamp("2010-01-01").date())
-    d2 = c2.date_input("时间窗 止", value=pd.Timestamp("2024-12-31").date())
+    d1 = c1.date_input("时间窗 起", value=pd.Timestamp("2009-01-01").date())
+    d2 = c2.date_input("时间窗 止", value=pd.Timestamp("2026-12-31").date())
     cats = c3.multiselect("灾害大类（五大类）", CATEGORIES, default=CATEGORIES)
 
     with st.expander("对比时间窗（生成差值图，可选）", expanded=False):
@@ -410,6 +410,21 @@ def tab_academic():
 
     st.caption("底图：GS(2020)4619 号标准地图（本地优先）/ 阿里 DataV GeoAtlas（云端兜底），底图无修改 · "
                "色带：YlOrRd 顺序 / RdBu_r 发散 · 制图要素：南海诸岛 inset、九段线、指北针、比例尺")
+
+    # 来源清单（display-first：来源必须像参考文献一样列清单 + 可点击原始链接）
+    with st.expander("📑 数据来源清单（含可点击原始链接）", expanded=False):
+        src_rows = [{"日期": e["date"], "事件": e["name"], "大类": e["category"],
+                     "子类": e["subtype"], "来源": e.get("source", ""),
+                     "原始链接": e.get("source_url", "—")}
+                    for e in events if e.get("source")]
+        if src_rows:
+            st.dataframe(pd.DataFrame(src_rows), use_container_width=True, hide_index=True)
+            n_url = sum(1 for r in src_rows if r["原始链接"] != "—")
+            st.caption(f"当前筛选 {len(src_rows)} 条，其中 {n_url} 条附官方原始链接。"
+                       "2026-10-28 起新增条目一律附链接；早期编纂条目（纯文字来源）将分批补齐，"
+                       "未上网来源标注'待补链接'，绝不放假链接。")
+        else:
+            st.caption("当前筛选条件下无事件。")
 
 
 # ---------------- 主流程 ----------------
