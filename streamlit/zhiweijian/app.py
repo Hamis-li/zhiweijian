@@ -364,10 +364,10 @@ def tab_weather():
 
 
 # =====================================================================
-# ⑤ 学术图组（历史灾害事件 · 分省 choropleth，Nature 系制图规范）
+# ⑤ 灾害数据可视化（历史灾害事件 · 分省 choropleth，Nature 系制图规范）
 # =====================================================================
 def tab_academic():
-    st.title("学术图组 · 历史灾害事件态势")
+    st.title("灾害数据可视化 · 历史灾害事件态势")
     st.caption("数据：编纂事件集（2010–2024 重大灾害，来源：应急管理部/中国气象局/水利部/"
                "自然资源部/USGS）+ USGS 历史地震动态补充 · 分类依据《自然灾害分类》五大类")
 
@@ -375,7 +375,7 @@ def tab_academic():
         from viz_academic import render_academic_figures
         from disaster_history import load_events, filter_events, usgs_history, CATEGORIES
     except Exception as e:
-        st.warning(f"学术图组依赖未就绪（{e}）：需 matplotlib 环境（requirements 已含）")
+        st.warning(f"灾害数据可视化依赖未就绪（{e}）：需 matplotlib 环境（requirements 已含）")
         return
 
     c1, c2, c3 = st.columns([1, 1, 2])
@@ -414,7 +414,7 @@ def tab_academic():
 
 # ---------------- 主流程 ----------------
 tab = st.sidebar.radio("模块",
-                       ["🔍 在线搜索·可视化", "📊 学术图组", "🗺 在线态势地图", "🧭 应急方案模块", "⚡ 实时天气仪表盘"],
+                       ["🔍 在线搜索·可视化", "📊 灾害数据可视化", "🗺 在线态势地图", "🧭 应急方案模块", "⚡ 实时天气仪表盘"],
                        index=0)
 if tab.startswith("🔍"):
     tab_search_viz()

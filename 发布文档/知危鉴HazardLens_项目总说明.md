@@ -28,7 +28,7 @@
 | v0.8（2026-09） | CaseRescue 知灾析策 | Coze(扣子) 知识卡片智能体 | 五份官方事故报告 → 四维知识卡片（概况/风险因素/措施/教训）；"每发表做成应用" |
 | v1.0（2026-10） | 知危鉴（zhiweijian 仓库） | FastAPI + 静态前端 + Streamlit 双栈 | 新增风险识别引擎、预警规则、RAG、SSE 实时流、在线态势地图（USGS/Open-Meteo/NHC 真实数据） |
 | v1.1（2026-10-27 定稿） | 知危鉴（单品牌） | 同上 | 命名统一（CaseRescue/知灾析策/智微界 清零、"数据萃取"→"在线数据整合"）、SCI 学术主题、修 CI |
-| v1.2（2026-10-27） | HazardLens–ZhiZai | 同上 | 新增「学术图组」：《自然灾害分类》五大类历史事件 + GS(2020)4619 标准底图分省 choropleth |
+| v1.2（2026-10-27） | HazardLens–ZhiZai | 同上 | 新增「灾害数据可视化」：《自然灾害分类》五大类历史事件 + GS(2020)4619 标准底图分省 choropleth |
 | v2.0（规划） | HazardLens–XiCe | 新项目 | 政策分析；配套云平台（上传数据→云端处理→Docker 部署） |
 
 ---
@@ -40,7 +40,7 @@
 | 板块 | 内容 | 现状 |
 |---|---|---|
 | ① **案例萃取** | 知乎四层萃取链路（检索→萃取→分析→复盘，强制附原文证据防幻觉）+ 官方案例知识卡片（四维结构化 + TF-IDF RAG 检索） | ✅ 已完成（知乎黑客松版 + Coze 版 + 仓库内案例模块） |
-| ② **案例可视化分布** | 在线态势地图（实时地震/台风/隐患点）+ 学术图组（五大类历史事件分省 choropleth、差值图、统计面板） | ✅ 已完成（本仓库 Streamlit 应用） |
+| ② **案例可视化分布** | 在线态势地图（实时地震/台风/隐患点）+ 灾害数据可视化（五大类历史事件分省 choropleth、差值图、统计面板） | ✅ 已完成（本仓库 Streamlit 应用） |
 | ③ **政策分析** | 基于②的分布规律与①的经验教训，做政策成效对比、对策建议生成 | ⏳ **下一个项目**（HazardLens–XiCe），本仓库仅预留接口 |
 
 ---
@@ -93,13 +93,13 @@
 | `folium` | 交互式态势地图（Leaflet；CartoDB Positron/Dark Matter 瓦片） |
 | `altair` | 统计图表（KPI、直方图、流程链） |
 | `pandas` | 数据表处理 |
-| `matplotlib` | **学术图组**（choropleth/差值图/小提琴，Nature 风格） |
+| `matplotlib` | **灾害数据可视化**（choropleth/差值图/小提琴，Nature 风格） |
 | `pyshp`（可选） | 读取 GS(2020)4619 标准底图 .shp（不依赖 geopandas，轻量） |
 | FastAPI 栈（工程化后端）：`fastapi / uvicorn / pydantic / scikit-learn` | 风险引擎、RAG（TF-IDF）、SSE 实时流 |
 
 ### 5.3 制图方法（怎么画的）
 1. **交互式地图**（在线态势地图）：`folium.Map(tiles="CartoDB Positron")` + 图层（地震 CircleMarker 半径∝震级 / 台风 PolyLine / 隐患点菱形）+ 左下角图例 + LayerControl。
-2. **学术图组**（Nature 风格展示，**只借风格不搬方法**）：
+2. **灾害数据可视化**（Nature 风格展示，**只借风格不搬方法**）：
    - 底图：GS(2020)4619 标准地图省级行政区.shp（pyshp + GBK 解码；Beijing1954-Lambert 投影坐标**直绘**，量级>1e5 自动判别），叠加国界线.shp（GBCODE=61010 九段线、26080 南海群岛岸线）；云端无本机文件时自动回退 DataV GeoAtlas；
    - 分省填色：事件经纬度→`bbox 粗筛 + 射线法`归省（或直接用 province 字段）→ 按省计数 → YlOrRd 顺序色带 / RdBu_r 发散色带（分位断点 BoundaryNorm）；
    - 制图要素：右下角**南海诸岛 inset**（九段线加粗）、左上**指北针**、左下 **0–500km 比例尺**、无数据省 **hatch="///"**、面板标号 (a)(b)(c)、colorbar 带单位"事件次数"；图注自动标注"底图审图号：GS(2020)4619 号（底图无修改）"；
