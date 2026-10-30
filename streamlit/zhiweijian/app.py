@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 import streamlit as st
 import folium
+from streamlit_folium import st_folium  # 修复(2026-10-30)：folium 地图需经 st_folium 渲染，st.write 不支持
 import pandas as pd
 import altair as alt
 
@@ -180,7 +181,7 @@ def tab_map():
                    min([c["lon"] for c in eq] + [s["lon"] for s in spots]) - 5],
                   [max([c["lat"] for c in eq] + [s["lat"] for s in spots]) + 5,
                    max([c["lon"] for c in eq] + [s["lon"] for s in spots]) + 5]])
-    st.write(m, height=560)
+    st_folium(m, height=560)
 
 
 # =====================================================================
@@ -323,7 +324,10 @@ def tab_plan():
     flow = pd.DataFrame({"stage": p["flow"], "owner": p["flow_owners"]})
     chart = (alt.Chart(flow).mark_rect().encode(
         x="stage:N", y=alt.value(1),
-        color=alt.condition(~flow["stage"].isin(["报告", "判级"]), "#4a76d9", "#F07C24"),
+        # 修复(2026-10-30)：alt.condition 不收 pandas Series（altair6.x TypeError），改用表达式谓词；
+        # 逻辑不变：报告/判级→橙(#F07C24)，其他→蓝(#4a76d9)
+        color=alt.condition("datum.stage == '报告' || datum.stage == '判级'",
+                            alt.value("#F07C24"), alt.value("#4a76d9")),
         tooltip=["stage", "owner"])
         .properties(width=560, height=120))
     st.altair_chart(chart, width="stretch")

@@ -1,5 +1,6 @@
 streamlit>=1.30
 folium>=0.15,<0.18
+streamlit-folium>=0.24
 matplotlib>=3.7
 altair>=5.0
 pandas>=2.0
