@@ -229,49 +229,55 @@ def tab_search_viz():
         if tl:
             tl_df = pd.DataFrame([{"阶段": c.get("narrative_phase", "突发冲突"),
                                    "时间": c["date"], "事件": c["title"]} for c in tl])
-            st.dataframe(tl_df, use_container_width=True, hide_index=True)
+            st.dataframe(tl_df, width="stretch", hide_index=True)
 
         # 三层视角（宏观-中观-微观）
         st.markdown("**🔍 三层视角**（政策层/地方层/现场层）")
         l3 = data_online.three_layer_view(rows)
         if l3:
             l3_df = pd.DataFrame(l3)
-            st.dataframe(l3_df, use_container_width=True, hide_index=True)
+            st.dataframe(l3_df, width="stretch", hide_index=True)
 
         # 证据来源分级（六类证据交叉印证）
         st.markdown("**📑 证据来源分布**（六类证据交叉印证）")
         ev = data_online.evidence_summary(rows)
-        st.dataframe(pd.DataFrame(ev), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(ev), width="stretch", hide_index=True)
 
         # 横向对照验证（同类灾害不同处置效果对比）
         st.markdown("**⚖️ 横向对照验证**（同类灾害不同处置效果）")
         cm = pd.DataFrame(data_online.comparison_matrix())
         if not cm.empty:
-            wide = cm.pivot(index="案例", columns="维度", values="评分")
+            # 修复(2026-10-30)：原 transform_stack(pivot=...) 为无效 altair API(TypeError)；
+            # 长表(cm: 案例/维度/评分)直接 mark_bar 即自动堆叠
             st.altair_chart(
-                alt.Chart(wide.reset_index()).transform_stack(
-                    pivot="维度").mark_bar().encode(
+                alt.Chart(cm).mark_bar().encode(
                     x="案例:N", y="评分:Q", color="维度:N",
                     tooltip=["案例", "维度", "评分"]),
-                use_container_width=True)
+                width="stretch")
 
         t1, t2, t3 = st.tabs(["📈 图表", "📋 表格", "📖 案例复盘卡"])
         with t1:
             st.markdown("**震级分布**")
-            hist = df.groupby(pd.cut(df["震级"], bins=[0, 4, 5, 6, 8, 12]))["震级"].count()
+            # 修复(2026-10-30)：原 groupby(...)[...].count() 的 index 名与 Series 名
+            # 均为"震级"，reset_index 冲突(ValueError)；改用 size() 并重命名，区间转字符串
+            hist = (df.groupby(pd.cut(df["震级"], bins=[0, 4, 5, 6, 8, 12]), observed=False)
+                      .size().rename("次数").reset_index())
+            hist["震级"] = hist["震级"].astype(str)
             st.altair_chart(
-                alt.Chart(hist.reset_index())
-                .mark_bar().encode(x="bin:N", y="震级:Q", tooltip=["bin", "震级"]),
-                use_container_width=True)
+                alt.Chart(hist)
+                .mark_bar().encode(x="震级:N", y="次数:Q", tooltip=["震级", "次数"]),
+                width="stretch")
             st.markdown("**震中空间分布（在线）**")
+            # 修复(2026-10-30)：原 mark_circle(size="mag") 把字段名传给了像素参数；
+            # 大小映射应放 encode(size=...)
             chart = (alt.Chart(df.assign(lon=df["经度"], lat=df["纬度"], mag=df["震级"]))
-                     .mark_circle(size="mag")
-                     .encode(x="lon:Q", y="lat:Q", color="mag:Q",
+                     .mark_circle()
+                     .encode(x="lon:Q", y="lat:Q", size="mag:Q", color="mag:Q",
                               tooltip=["标题", "时间", "震级", "区域"])
                      .properties(width=700, height=420))
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(chart, width="stretch")
         with t2:
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
             st.caption(f"数据源：USGS (online) · 抓取于 {dataset['fetched_at']} · 无本地缓存文件")
         with t3:
             st.markdown("点击案例查看 **过程线 → 动因 → 可迁移经验 + 证据强度**：")
@@ -320,7 +326,7 @@ def tab_plan():
         color=alt.condition(~flow["stage"].isin(["报告", "判级"]), "#4a76d9", "#F07C24"),
         tooltip=["stage", "owner"])
         .properties(width=560, height=120))
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 
 # =====================================================================
@@ -358,7 +364,7 @@ def tab_weather():
             alt.Chart(df).mark_bar().encode(
                 x="项:N", y="值:Q", color="项:N",
                 tooltip=["项", "值"]).properties(width=560, height=320),
-            use_container_width=True)
+            width="stretch")
     else:
         st.warning(f"在线天气获取失败：{w.get('error')}")
 
@@ -418,7 +424,7 @@ def tab_academic():
                      "原始链接": e.get("source_url", "—")}
                     for e in events if e.get("source")]
         if src_rows:
-            st.dataframe(pd.DataFrame(src_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(src_rows), width="stretch", hide_index=True)
             n_url = sum(1 for r in src_rows if r["原始链接"] != "—")
             st.caption(f"当前筛选 {len(src_rows)} 条，全部附来源链接。"
                        "2026-10-28 新增条目为事件专属官方通报页；早期编纂条目链接指向来源机构权威栏目页"
